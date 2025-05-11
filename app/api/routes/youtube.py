@@ -1,9 +1,9 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Header
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Header, status
 from sqlalchemy.orm import Session
 from typing import Optional, List, Dict, Any
 
 from app.db.database import get_db
-from app.models.database import OutputFormat, ProcessingMode, User, Video
+from app.models.database import OutputFormat, ProcessingMode, User, Video, ProcessingJob
 from app.services.youtube import YouTubeService, YouTubeProcessingJob
 from app.services.auth import get_current_active_user, validate_api_key
 from app.services.subscription import SubscriptionService
@@ -30,108 +30,55 @@ async def process_youtube_video(
         mode: Processing mode (simple or detailed)
         output_format: Output format for the processed content
     """
-    # For development, we'll just return a mock response
-    return {
-        "job_id": "dev_job_123",
-        "video_id": video_id,
-        "status": "processing",
-        "mode": mode,
-        "output_format": output_format
-    }
-
-@router.get("/status/{job_id}")
-async def get_processing_status(
-    job_id: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
-):
-    """Get the status of a processing job."""
-    # For development, we'll just return a mock response
-    return {
-        "job_id": job_id,
-        "status": "processing",
-        "progress": 0.5,
-        "created_at": "2025-05-11T12:00:00Z"
-    }
-
-@router.get("/result/{video_id}")
-async def get_video_result(
-    video_id: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
-):
-    """Get the processed result for a video."""
-    # For development, we'll just return a mock response
-    return {
-        "video_id": video_id,
-        "title": "Sample Video",
-        "output_format": "step_by_step",
-        "content": {
-            "type": "step_by_step",
-            "sections": [
-                {
-                    "title": "Introduction",
-                    "steps": ["Step 1: Getting started", "Step 2: Understanding the basics"]
-                },
-                {
-                    "title": "Main Content",
-                    "steps": ["Step 3: Detailed explanation", "Step 4: Examples"]
-                }
-            ]
-        }
-    }
-
-@router.get("/status")
-async def youtube_status():
-    return {"status": "YouTube routes are working"}
-
-@router.post("/api/process/{video_id}")
-async def api_process_youtube_video(
-    video_id: str,
-    background_tasks: BackgroundTasks,
-    mode: ProcessingMode = Query(
-        ProcessingMode.DETAILED,
-        description="Processing mode: simple or detailed"
-    ),
-    output_format: OutputFormat = Query(
-        OutputFormat.STEP_BY_STEP,
-        description="Output format: bullet_points, summary, step_by_step, or podcast_article"
-    ),
-    api_key: str = Header(..., description="API key for authentication"),
-    db: Session = Depends(get_db)
-):
-    """API endpoint for processing a YouTube video."""
-    # Validate API key and get user
-    user = await validate_api_key(api_key, db)
+    # Convert string parameters to enum values
+    try:
+        processing_mode = ProcessingMode(mode)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid mode: {mode}. Valid values are: simple, detailed"
+        )
+    
+    try:
+        output_format_enum = OutputFormat(output_format)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid output format: {output_format}. Valid values are: bullet_points, summary, step_by_step, podcast_article"
+        )
     
     # Validate subscription permissions
-    await SubscriptionService.validate_processing_request(db, user.id, mode, output_format)
+    await SubscriptionService.validate_processing_request(
+        db, current_user.id, processing_mode, output_format_enum
+    )
     
     # Create video entry in database
     db_video = await youtube_service.create_video_db_entry(
-        db, user.id, video_id, mode, output_format
+        db, current_user.id, video_id, processing_mode, output_format_enum
     )
     
     # Create processing job
-    job = await youtube_service.create_processing_job(db, db_video.id, mode, output_format)
+    job = await youtube_service.create_processing_job(
+        db, db_video.id, processing_mode, output_format_enum
+    )
     
     # Process in background
     processing_job = await YouTubeProcessingJob.get_job(db, job.job_id)
     background_tasks.add_task(processing_job.process)
     
     # Increment usage quota
-    await SubscriptionService.increment_usage(db, user.id)
+    await SubscriptionService.increment_usage(db, current_user.id)
     
     return {
         "job_id": job.job_id,
         "video_id": video_id,
         "status": "processing",
-        "mode": mode.value,
-        "output_format": output_format.value
+        "mode": processing_mode.value,
+        "output_format": output_format_enum.value
     }
 
-@router.get("/status/{job_id}")
-async def get_processing_status(
+@router.get("/job-status/{job_id}")
+async def get_job_status(
     job_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -139,8 +86,8 @@ async def get_processing_status(
     """Get the status of a processing job."""
     try:
         # Get job from database
-        job = db.query(YouTubeProcessingJob).filter(
-            YouTubeProcessingJob.job_id == job_id
+        job = db.query(ProcessingJob).filter(
+            ProcessingJob.job_id == job_id
         ).first()
         
         if not job:
@@ -162,8 +109,8 @@ async def get_processing_status(
             "error": processing_job.job.error,
             "mode": processing_job.job.mode.value,
             "output_format": processing_job.job.output_format.value,
-            "created_at": processing_job.job.created_at,
-            "completed_at": processing_job.job.completed_at
+            "created_at": processing_job.job.created_at.isoformat(),
+            "completed_at": processing_job.job.completed_at.isoformat() if processing_job.job.completed_at else None
         }
     except HTTPException:
         raise
@@ -173,54 +120,8 @@ async def get_processing_status(
             detail=f"Failed to get status: {str(e)}"
         )
 
-@router.get("/api/status/{job_id}")
-async def api_get_processing_status(
-    job_id: str,
-    api_key: str = Header(..., description="API key for authentication"),
-    db: Session = Depends(get_db)
-):
-    """API endpoint to get the status of a processing job."""
-    # Validate API key and get user
-    user = await validate_api_key(api_key, db)
-    
-    try:
-        # Get job from database
-        job = db.query(YouTubeProcessingJob).filter(
-            YouTubeProcessingJob.job_id == job_id
-        ).first()
-        
-        if not job:
-            raise HTTPException(status_code=404, detail="Job not found")
-        
-        # Check if job belongs to user
-        video = db.query(Video).filter(Video.id == job.video_id).first()
-        if not video or video.user_id != user.id:
-            raise HTTPException(status_code=403, detail="Not authorized to access this job")
-        
-        # Get processing job
-        processing_job = await YouTubeProcessingJob.get_job(db, job_id)
-        
-        return {
-            "job_id": job_id,
-            "video_id": video.video_id,
-            "status": processing_job.job.status,
-            "progress": processing_job.job.progress,
-            "error": processing_job.job.error,
-            "mode": processing_job.job.mode.value,
-            "output_format": processing_job.job.output_format.value,
-            "created_at": processing_job.job.created_at,
-            "completed_at": processing_job.job.completed_at
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get status: {str(e)}"
-        )
-
-@router.get("/result/{video_id}")
-async def get_video_result(
+@router.get("/video-result/{video_id}")
+async def get_processed_video(
     video_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -272,8 +173,104 @@ async def get_video_result(
             detail=f"Failed to get video result: {str(e)}"
         )
 
-@router.get("/api/result/{video_id}")
-async def api_get_video_result(
+@router.get("/status")
+async def youtube_status():
+    """Check if YouTube routes are working."""
+    return {"status": "YouTube routes are working"}
+
+@router.post("/api/process/{video_id}")
+async def api_process_youtube_video(
+    video_id: str,
+    background_tasks: BackgroundTasks,
+    mode: ProcessingMode = Query(
+        ProcessingMode.DETAILED,
+        description="Processing mode: simple or detailed"
+    ),
+    output_format: OutputFormat = Query(
+        OutputFormat.STEP_BY_STEP,
+        description="Output format: bullet_points, summary, step_by_step, or podcast_article"
+    ),
+    api_key: str = Header(..., description="API key for authentication"),
+    db: Session = Depends(get_db)
+):
+    """API endpoint for processing a YouTube video."""
+    # Validate API key and get user
+    user = await validate_api_key(api_key, db)
+    
+    # Validate subscription permissions
+    await SubscriptionService.validate_processing_request(db, user.id, mode, output_format)
+    
+    # Create video entry in database
+    db_video = await youtube_service.create_video_db_entry(
+        db, user.id, video_id, mode, output_format
+    )
+    
+    # Create processing job
+    job = await youtube_service.create_processing_job(db, db_video.id, mode, output_format)
+    
+    # Process in background
+    processing_job = await YouTubeProcessingJob.get_job(db, job.job_id)
+    background_tasks.add_task(processing_job.process)
+    
+    # Increment usage quota
+    await SubscriptionService.increment_usage(db, user.id)
+    
+    return {
+        "job_id": job.job_id,
+        "video_id": video_id,
+        "status": "processing",
+        "mode": mode.value,
+        "output_format": output_format.value
+    }
+
+@router.get("/api/job-status/{job_id}")
+async def api_get_job_status(
+    job_id: str,
+    api_key: str = Header(..., description="API key for authentication"),
+    db: Session = Depends(get_db)
+):
+    """API endpoint to get the status of a processing job."""
+    # Validate API key and get user
+    user = await validate_api_key(api_key, db)
+    
+    try:
+        # Get job from database
+        job = db.query(ProcessingJob).filter(
+            ProcessingJob.job_id == job_id
+        ).first()
+        
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        
+        # Check if job belongs to user
+        video = db.query(Video).filter(Video.id == job.video_id).first()
+        if not video or video.user_id != user.id:
+            raise HTTPException(status_code=403, detail="Not authorized to access this job")
+        
+        # Get processing job
+        processing_job = await YouTubeProcessingJob.get_job(db, job_id)
+        
+        return {
+            "job_id": job_id,
+            "video_id": video.video_id,
+            "status": processing_job.job.status,
+            "progress": processing_job.job.progress,
+            "error": processing_job.job.error,
+            "mode": processing_job.job.mode.value,
+            "output_format": processing_job.job.output_format.value,
+            "created_at": processing_job.job.created_at.isoformat(),
+            "completed_at": processing_job.job.completed_at.isoformat() if processing_job.job.completed_at else None
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get status: {str(e)}"
+        )
+
+@router.get("/api/video-result/{video_id}")
+async def api_get_processed_video(
     video_id: str,
     api_key: str = Header(..., description="API key for authentication"),
     db: Session = Depends(get_db)
@@ -349,8 +346,8 @@ async def get_user_videos(
             "status": video.status,
             "processing_mode": video.processing_mode.value,
             "output_format": video.output_format.value,
-            "created_at": video.created_at,
-            "updated_at": video.updated_at
+            "created_at": video.created_at.isoformat(),
+            "updated_at": video.updated_at.isoformat()
         })
     
     return results
@@ -372,8 +369,8 @@ async def delete_video(
         raise HTTPException(status_code=404, detail="Video not found")
     
     # Delete associated jobs
-    jobs = db.query(YouTubeProcessingJob).filter(
-        YouTubeProcessingJob.video_id == video.id
+    jobs = db.query(ProcessingJob).filter(
+        ProcessingJob.video_id == video.id
     ).all()
     
     for job in jobs:

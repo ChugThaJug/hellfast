@@ -98,3 +98,48 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
 async def get_current_active_user(current_user: User = Depends(get_current_user)):
     """Get current active user."""
     return current_user
+
+async def validate_api_key(api_key: str, db: Session) -> User:
+    """Validate API key and return the associated user."""
+    # Check if API key exists
+    db_api_key = db.query(ApiKey).filter(ApiKey.api_key == api_key, ApiKey.is_active == True).first()
+    
+    if not db_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key"
+        )
+    
+    # Update last used timestamp
+    db_api_key.last_used_at = datetime.utcnow()
+    db.commit()
+    
+    # Get user
+    user = db.query(User).filter(User.id == db_api_key.user_id, User.is_active == True).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found or inactive"
+        )
+    
+    return user
+
+async def create_api_key(db: Session, user_id: int, name: str = "Default API Key") -> str:
+    """Create a new API key for a user."""
+    # Generate a unique API key
+    api_key = f"{settings.API_KEY_PREFIX}{secrets.token_urlsafe(32)}"
+    
+    # Create API key in database
+    db_api_key = ApiKey(
+        user_id=user_id,
+        api_key=api_key,
+        name=name,
+        created_at=datetime.utcnow(),
+        is_active=True
+    )
+    
+    db.add(db_api_key)
+    db.commit()
+    
+    return api_key

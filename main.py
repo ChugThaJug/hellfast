@@ -8,9 +8,10 @@ from sqlalchemy.orm import Session
 
 from app.core.settings import settings
 from app.db.database import create_tables, get_db
-from app.api.routes import auth, youtube, subscription
+from app.api.routes import auth, youtube, subscription, firebase_auth
 from app.models.database import User
-from app.services.auth import get_current_active_user
+from app.dependencies.auth import get_current_active_user
+from app.services.firebase_auth import initialize_firebase_admin
 
 # Configure logging
 logging.basicConfig(
@@ -22,12 +23,19 @@ logger = logging.getLogger(__name__)
 # Startup and shutdown events
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Create database tables
+    # Startup: Create database tables and initialize Firebase
     try:
         create_tables()
         logger.info("Database tables created successfully")
+        
+        # Initialize Firebase Admin SDK
+        try:
+            initialize_firebase_admin()
+            logger.info("Firebase Admin SDK initialized successfully")
+        except Exception as e:
+            logger.error(f"Firebase initialization failed: {str(e)}")
     except Exception as e:
-        logger.error(f"Error creating database tables: {str(e)}")
+        logger.error(f"Error during startup: {str(e)}")
     
     yield
     
@@ -70,9 +78,10 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 # Include routers
-app.include_router(auth.router)
+app.include_router(auth.router)  # Keep for backward compatibility
 app.include_router(youtube.router)
 app.include_router(subscription.router)
+app.include_router(firebase_auth.router)  # Add Firebase auth routes
 
 # Root endpoint
 @app.get("/")
@@ -106,6 +115,8 @@ async def get_profile(
         "id": current_user.id,
         "username": current_user.username,
         "email": current_user.email,
+        "display_name": getattr(current_user, "display_name", None),
+        "photo_url": getattr(current_user, "photo_url", None),
         "created_at": current_user.created_at.isoformat(),
         "subscription": {
             "plan": subscription_features["plan"],
@@ -114,12 +125,7 @@ async def get_profile(
         }
     }
 
-import uvicorn
-import logging
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 if __name__ == "__main__":
+    import uvicorn
     logger.info("Starting YouTube Processing API...")
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

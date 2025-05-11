@@ -13,10 +13,10 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost/ytprocessing")
     
-    # JWT Authentication
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-keep-it-secret")
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    # Firebase Authentication
+    FIREBASE_PROJECT_ID: str = os.getenv("FIREBASE_PROJECT_ID", "")
+    FIREBASE_WEB_API_KEY: str = os.getenv("FIREBASE_WEB_API_KEY", "")
+    FIREBASE_SERVICE_ACCOUNT_KEY: str = os.getenv("FIREBASE_SERVICE_ACCOUNT_KEY", "")
     
     # Stripe integration
     STRIPE_API_KEY: Optional[str] = os.getenv("STRIPE_API_KEY")
@@ -76,19 +76,22 @@ class Settings(BaseSettings):
     # Logging settings
     LOG_LEVEL: str = "INFO"
     
+    # Cache retention (days)
+    CACHE_RETENTION_DAYS: int = 7
+    
     # Subscription plans
     SUBSCRIPTION_PLANS: Dict[str, Dict] = {
         "free": {
             "name": "Free",
             "price": 0,
             "monthly_quota": 3,
-            "features": ["simple_mode"]
+            "features": ["simple_mode", "detailed_mode", "bullet_points", "summary", "step_by_step"]
         },
         "basic": {
             "name": "Basic",
             "price": 9.99,
             "monthly_quota": 20,
-            "features": ["simple_mode", "detailed_mode", "bullet_points", "summary"]
+            "features": ["simple_mode", "detailed_mode", "bullet_points", "summary", "step_by_step"]
         },
         "premium": {
             "name": "Premium",

@@ -8,6 +8,8 @@ from youtube_transcript_api import YouTubeTranscriptApi
 from fastapi import HTTPException
 import yt_dlp
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.exc import DetachedInstanceError
+from app.db.database import SessionLocal
 
 from app.core.settings import settings
 from app.services.openai import OpenAIService
@@ -413,62 +415,108 @@ class YouTubeProcessingJob:
     
     async def process(self):
         """Process YouTube video based on selected mode."""
+        # Create a new database session for this background task
+        db = SessionLocal()
+        
         try:
+            # Get fresh copies of the job and video from the database
+            job = db.query(ProcessingJob).filter(ProcessingJob.job_id == self.job_id).first()
+            if not job:
+                logger.error(f"Job {self.job_id} not found in the database")
+                return
+                
+            video = db.query(Video).filter(Video.id == job.video_id).first()
+            if not video:
+                logger.error(f"Video for job {self.job_id} not found in the database")
+                job.status = "failed"
+                job.error = "Video not found"
+                db.commit()
+                return
+            
             # Update status
-            self.job.status = "processing"
-            self.db.commit()
+            job.status = "processing"
+            db.commit()
             
-            await self.update_progress(0.1, "Starting processing")
+            # Use video_id from the video object directly
+            video_id = video.video_id
             
-            # Process based on mode
-            if self.job.mode == ProcessingMode.SIMPLE:
-                processed_content, input_tokens, output_tokens, price = await self.youtube_service.process_simple(
-                    self.video.video_id,
-                    self.job.output_format
-                )
-                await self.update_progress(0.8, "Processing completed")
-            else:  # ProcessingMode.DETAILED
-                processed_content, input_tokens, output_tokens, price = await self.youtube_service.process_detailed(
-                    self.video.video_id,
-                    self.job.output_format
-                )
-                await self.update_progress(0.8, "Processing completed")
-            
-            # Update job with results
-            self.job.result = processed_content
-            self.job.input_tokens = input_tokens
-            self.job.output_tokens = output_tokens
-            self.job.cost = price
-            self.job.completed_at = datetime.utcnow()
-            self.job.status = "completed"
-            self.job.progress = 1.0
-            
-            # Update video status
-            self.video.status = "completed"
-            self.video.stats = {
-                "input_tokens": input_tokens,
-                "output_tokens": output_tokens,
-                "cost": price
-            }
-            self.video.chapters = processed_content
-            
-            # Save to database
-            self.db.commit()
-            
+            try:
+                await self._update_progress_in_session(db, job.job_id, 0.1, "Starting processing")
+                
+                # Process based on mode
+                if job.mode == ProcessingMode.SIMPLE:
+                    processed_content, input_tokens, output_tokens, price = await self.youtube_service.process_simple(
+                        video_id,
+                        job.output_format
+                    )
+                    await self._update_progress_in_session(db, job.job_id, 0.8, "Processing completed")
+                else:  # ProcessingMode.DETAILED
+                    processed_content, input_tokens, output_tokens, price = await self.youtube_service.process_detailed(
+                        video_id,
+                        job.output_format
+                    )
+                    await self._update_progress_in_session(db, job.job_id, 0.8, "Processing completed")
+                
+                # Get fresh copies of job and video again to avoid any detached issues
+                job = db.query(ProcessingJob).filter(ProcessingJob.job_id == self.job_id).first()
+                video = db.query(Video).filter(Video.id == job.video_id).first()
+                
+                # Update job with results
+                job.result = processed_content
+                job.input_tokens = input_tokens
+                job.output_tokens = output_tokens
+                job.cost = price
+                job.completed_at = datetime.utcnow()
+                job.status = "completed"
+                job.progress = 1.0
+                
+                # Update video status
+                video.status = "completed"
+                video.stats = {
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "cost": price
+                }
+                video.chapters = processed_content
+                
+                # Save to database
+                db.commit()
+                logger.info(f"Job {self.job_id} completed successfully")
+                
+            except Exception as e:
+                logger.error(f"Job {self.job_id} failed: {str(e)}")
+                
+                # Get fresh copies of job and video again
+                job = db.query(ProcessingJob).filter(ProcessingJob.job_id == self.job_id).first()
+                video = db.query(Video).filter(Video.id == job.video_id).first()
+                
+                if job:
+                    # Update job status
+                    job.status = "failed"
+                    job.error = str(e)
+                
+                if video:
+                    # Update video status
+                    video.status = "failed"
+                    video.error = str(e)
+                
+                # Save to database
+                db.commit()
+        
         except Exception as e:
-            logger.error(f"Job {self.job_id} failed: {str(e)}")
-            
-            # Update job status
-            self.job.status = "failed"
-            self.job.error = str(e)
-            
-            # Update video status
-            self.video.status = "failed"
-            self.video.error = str(e)
-            
-            # Save to database
-            self.db.commit()
-            raise
+            logger.error(f"Error in background processing for job {self.job_id}: {str(e)}")
+        finally:
+            # Close the database session
+            db.close()
+    
+    @staticmethod
+    async def _update_progress_in_session(db: Session, job_id: str, progress: float, description: str = ""):
+        """Update job progress within a specific session."""
+        job = db.query(ProcessingJob).filter(ProcessingJob.job_id == job_id).first()
+        if job:
+            job.progress = progress
+            db.commit()
+            logger.info(f"Job {job_id}: {description} - {progress:.2%}")
     
     @staticmethod
     async def get_job(db: Session, job_id: str) -> "YouTubeProcessingJob":

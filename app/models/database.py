@@ -22,8 +22,11 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
     username = Column(String, unique=True)
-    hashed_password = Column(String)
+    firebase_uid = Column(String, unique=True, index=True, nullable=True)  # Firebase User ID
+    display_name = Column(String, nullable=True)  # From Firebase profile
+    photo_url = Column(String, nullable=True)  # From Firebase profile
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     is_active = Column(Boolean, default=True)
     
     # Relationships

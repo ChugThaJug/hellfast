@@ -8,7 +8,7 @@ from app.db.database import get_db
 from app.models.database import User, ApiKey
 from app.services.auth import (
     authenticate_user, create_access_token, create_user, get_password_hash,
-    get_current_active_user
+    get_current_active_user, create_api_key
 )
 from app.core.settings import settings
 
@@ -33,6 +33,18 @@ class UserResponse(BaseModel):
     class Config:
         orm_mode = True
 
+class ApiKeyCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=50)
+
+class ApiKeyResponse(BaseModel):
+    name: str
+    api_key: str
+    created_at: str
+
+    class Config:
+        orm_mode = True
+
+# Create router
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
 @router.post("/token", response_model=Token)
@@ -77,6 +89,21 @@ async def read_users_me(current_user: User = Depends(get_current_active_user)):
         username=current_user.username,
         email=current_user.email,
         is_active=current_user.is_active
+    )
+
+@router.post("/api-key", response_model=ApiKeyResponse)
+async def create_new_api_key(
+    key_data: ApiKeyCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Create a new API key for the current user."""
+    api_key = await create_api_key(db, current_user.id, key_data.name)
+    
+    return ApiKeyResponse(
+        name=key_data.name,
+        api_key=api_key,
+        created_at=db.query(ApiKey).filter(ApiKey.api_key == api_key).first().created_at.isoformat()
     )
 
 @router.get("/status")
