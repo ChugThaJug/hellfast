@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     APP_TITLE: str = "YouTube Processing API"
     APP_DESCRIPTION: str = "API for processing YouTube videos and generating structured content"
     APP_VERSION: str = "1.0.0"
+
+    APP_ENV: str = os.getenv("APP_ENV", "production")  # "development" or "production"
+
     
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost/ytprocessing")
@@ -17,6 +20,9 @@ class Settings(BaseSettings):
     FIREBASE_PROJECT_ID: str = os.getenv("FIREBASE_PROJECT_ID", "")
     FIREBASE_WEB_API_KEY: str = os.getenv("FIREBASE_WEB_API_KEY", "")
     FIREBASE_SERVICE_ACCOUNT_KEY: str = os.getenv("FIREBASE_SERVICE_ACCOUNT_KEY", "")
+
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+
     
     # Stripe integration
     STRIPE_API_KEY: Optional[str] = os.getenv("STRIPE_API_KEY")
@@ -107,27 +113,33 @@ class Settings(BaseSettings):
         }
     }
     
-    # Prompts for different output formats
+    # In app/core/settings.py, update the SYSTEM_PROMPTS section
+
     SYSTEM_PROMPTS: Dict[str, str] = {
         "bullet_points": """Transform this transcript into concise bullet points.
         Focus on key information, main ideas, and important details.
         Use clear, direct language and standard bullet point formatting.
-        Maintain the logical flow of information.""",
+        Maintain the logical flow of information.
+        Ensure bullet points are non-repetitive and build on each other.""",
         
         "summary": """Create a concise summary of this transcript.
         Capture the main ideas and essential information.
         Maintain the original meaning while condensing the content.
-        Aim for clarity and brevity.""",
+        Aim for clarity and brevity.
+        Ensure a coherent flow of information throughout the summary.""",
         
         "step_by_step": """Transform this transcript into a detailed, step-by-step guide.
         Organize the content into logical steps or phases.
         Include relevant background information and context.
-        Make the guide clear and actionable for someone who wants to follow along.""",
+        Make the guide clear and actionable for someone who wants to follow along.
+        Ensure steps are numbered sequentially and build naturally on each other.
+        Avoid repeating information across steps.""",
         
         "podcast_article": """Transform this transcript into a well-structured article or podcast script.
         Use engaging, conversational language.
         Organize content with clear paragraphs and smooth transitions.
-        Include relevant context and maintain a narrative flow."""
+        Include relevant context and maintain a narrative flow.
+        Ensure ideas connect logically from one paragraph to the next."""
     }
 
     class Config:

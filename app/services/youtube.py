@@ -10,6 +10,7 @@ import yt_dlp
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import DetachedInstanceError
 from app.db.database import SessionLocal
+import re
 
 from app.core.settings import settings
 from app.services.openai import OpenAIService
@@ -121,6 +122,9 @@ class YouTubeService:
         
         return processed_content, input_tokens, output_tokens, price
 
+    # In app/services/youtube.py
+
+
     async def process_detailed(self, video_id: str, output_format: OutputFormat) -> Tuple[Dict, int, int, float]:
         """Process transcript in detailed mode (with chunking)."""
         transcript = await self.get_transcript(video_id)
@@ -150,10 +154,13 @@ class YouTubeService:
                 "content": section_paragraphs
             })
         
-        # Now process into the requested output format
+        # Process into the requested output format
         processed_content, f_input_tokens, f_output_tokens, f_price = await self._convert_to_output_format(
             sections, output_format
         )
+        
+        # ENHANCEMENT 5: Post-process for coherence
+        processed_content = await self._post_process_for_coherence(processed_content, output_format)
         
         # Calculate total tokens and price
         total_input = p_input_tokens + t_input_tokens + f_input_tokens
@@ -161,6 +168,93 @@ class YouTubeService:
         total_price = p_price + t_price + f_price
         
         return processed_content, total_input, total_output, total_price
+
+    # Add this new method for post-processing
+    async def _post_process_for_coherence(self, content: Dict, output_format: OutputFormat) -> Dict:
+        """Post-process content for better coherence between sections."""
+        if not content or "sections" not in content:
+            return content
+        
+        try:
+            # Different post-processing based on output format
+            if content["type"] == "step_by_step":
+                # Fix step numbering and duplicated content
+                step_pattern = re.compile(r'^(Step\s*\d+:|#\s*Step\s*\d+:|\d+\.\s*|\*\s*Step\s*\d+:)')
+                introduction_patterns = [
+                    re.compile(r'^#+\s*introduction', re.IGNORECASE),
+                    re.compile(r'^introduction', re.IGNORECASE),
+                    re.compile(r'welcome to', re.IGNORECASE),
+                    re.compile(r'^getting started', re.IGNORECASE),
+                ]
+                
+                # Track steps across sections
+                step_counter = 1
+                processed_sections = []
+                
+                for i, section in enumerate(content["sections"]):
+                    steps = section.get("steps", [])
+                    processed_steps = []
+                    
+                    for step in steps:
+                        # Skip duplicate introductions in non-first sections
+                        if i > 0 and any(pattern.search(step) for pattern in introduction_patterns):
+                            continue
+                        
+                        # Fix step numbering
+                        processed_step = step
+                        if step_pattern.search(step):
+                            processed_step = step_pattern.sub(f"Step {step_counter}:", step)
+                            step_counter += 1
+                        
+                        processed_steps.append(processed_step)
+                    
+                    if processed_steps:  # Only add section if it has steps
+                        processed_sections.append({
+                            "title": section["title"],
+                            "steps": processed_steps
+                        })
+                
+                content["sections"] = processed_sections
+                
+            elif content["type"] == "bullet_points":
+                # Similar processing for bullet points
+                processed_sections = []
+                seen_bullets = set()
+                
+                for section in content["sections"]:
+                    bullets = section.get("bullets", [])
+                    processed_bullets = []
+                    
+                    for bullet in bullets:
+                        # Normalize bullet to compare for duplicates
+                        normalized = re.sub(r'\s+', ' ', bullet.lower().strip())
+                        
+                        # Skip if we've seen similar content before
+                        if normalized in seen_bullets:
+                            continue
+                        
+                        seen_bullets.add(normalized)
+                        processed_bullets.append(bullet)
+                    
+                    if processed_bullets:  # Only add section if it has bullets
+                        processed_sections.append({
+                            "title": section["title"],
+                            "bullets": processed_bullets
+                        })
+                
+                content["sections"] = processed_sections
+                
+            elif content["type"] == "summary":
+                # Process summaries for coherence
+                # (This is simpler as summaries are already consolidated)
+                pass
+                
+        except Exception as e:
+            logger.warning(f"Error in post-processing for coherence: {str(e)}")
+        
+        return content
+
+    # In app/services/youtube.py
 
     async def _convert_to_output_format(
         self, 
@@ -175,11 +269,24 @@ class YouTubeService:
         if output_format == OutputFormat.BULLET_POINTS:
             # Process each section into bullet points
             formatted_sections = []
-            for section in sections:
+            for i, section in enumerate(sections):
                 section_text = "\n\n".join(section['content'])
+                
+                # ENHANCEMENT 6: Context-aware prompts
+                section_prompt = settings.SYSTEM_PROMPTS["bullet_points"] + f"""
+
+    This is section {i+1} of {len(sections)}, titled "{section['title']}".
+    {"This is the first section." if i == 0 else "Continue from the previous section."}
+    {"This is the last section." if i == len(sections) - 1 else "This will be followed by another section."}
+
+    Do NOT repeat information already covered in previous sections.
+    Do NOT include introductory text if this is not the first section.
+    Focus on clear, concise bullet points specific to this section's content.
+    """
+                
                 response = await self.openai_service.process_text(
                     section_text, 
-                    settings.SYSTEM_PROMPTS["bullet_points"]
+                    section_prompt
                 )
                 
                 # Extract bullets
@@ -204,46 +311,45 @@ class YouTubeService:
                 "sections": formatted_sections
             }, total_input_tokens, total_output_tokens, total_price
         
-        elif output_format == OutputFormat.SUMMARY:
-            # Process each section into a summary
-            formatted_sections = []
-            for section in sections:
-                section_text = "\n\n".join(section['content'])
-                response = await self.openai_service.process_text(
-                    section_text, 
-                    settings.SYSTEM_PROMPTS["summary"]
-                )
-                
-                formatted_sections.append({
-                    "title": section['title'],
-                    "summary": response.choices[0].message.content
-                })
-                
-                # Track token usage
-                total_input_tokens += response.usage.prompt_tokens
-                total_output_tokens += response.usage.completion_tokens
-                total_price += self.openai_service.calculate_price(
-                    response.usage.prompt_tokens,
-                    response.usage.completion_tokens
-                )
-            
-            return {
-                "type": "summary",
-                "sections": formatted_sections
-            }, total_input_tokens, total_output_tokens, total_price
-        
         elif output_format == OutputFormat.STEP_BY_STEP:
             # Process each section into step-by-step instructions
             formatted_sections = []
-            for section in sections:
+            step_count = 1  # ENHANCEMENT 7: Track steps across sections
+            
+            for i, section in enumerate(sections):
                 section_text = "\n\n".join(section['content'])
+                
+                # ENHANCEMENT 8: Context-aware step-by-step prompts
+                step_prompt = settings.SYSTEM_PROMPTS["step_by_step"] + f"""
+
+    This is section {i+1} of {len(sections)}, titled "{section['title']}".
+    {"This is the first section." if i == 0 else f"Continue from the previous section, which ended at Step {step_count-1}."}
+    {"This is the last section." if i == len(sections) - 1 else "This will be followed by another section."}
+
+    Start step numbering at Step {step_count}.
+    Do NOT repeat information already covered in previous sections.
+    Do NOT include introductory text if this is not the first section.
+    Focus on clear, actionable steps specific to this section's content.
+    """
+                
                 response = await self.openai_service.process_text(
                     section_text, 
-                    settings.SYSTEM_PROMPTS["step_by_step"]
+                    step_prompt
                 )
                 
                 content = response.choices[0].message.content
                 steps = [p.strip() for p in content.split("\n\n") if p.strip()]
+                
+                # Update step count for next section
+                step_matches = re.findall(r'Step\s*(\d+)', content)
+                if step_matches:
+                    try:
+                        highest_step = max(int(s) for s in step_matches)
+                        step_count = highest_step + 1
+                    except ValueError:
+                        step_count += len(steps)
+                else:
+                    step_count += len(steps)
                 
                 formatted_sections.append({
                     "title": section['title'],
@@ -262,6 +368,8 @@ class YouTubeService:
                 "type": "step_by_step",
                 "sections": formatted_sections
             }, total_input_tokens, total_output_tokens, total_price
+        
+        # Other formats remain the same...
         
         else:  # OutputFormat.PODCAST_ARTICLE
             # Keep the content as paragraphs

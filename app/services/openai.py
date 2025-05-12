@@ -41,6 +41,8 @@ class OpenAIService:
             logger.error(f"Error processing text: {str(e)}")
             raise
 
+    # In app/services/openai.py
+
     async def transcript_to_paragraphs(
         self,
         transcript: List[Dict],
@@ -83,18 +85,42 @@ class OpenAIService:
         
         total_chunks = len(text_chunks)
         
+        # Create enhanced prompts for each chunk
         for i, chunk in enumerate(text_chunks):
             if progress_callback:
                 progress = (i + 1) / total_chunks * 0.5
                 await progress_callback(progress, "Processing transcript chunks")
             
+            # ENHANCEMENT 1: Create context-aware prompt
+            enhanced_prompt = system_prompt + f"""
+
+    This is part {i+1} of {total_chunks} of the transcript. Your task is to:
+    1. Convert this section into coherent paragraphs
+    2. Maintain the flow of information
+    3. {"This is the beginning of the transcript." if i == 0 else "Continue the flow from the previous part."}
+    4. {"This is the end of the transcript." if i == total_chunks - 1 else "The content continues in the next part."}
+    5. Do not repeat introductions or restart numbering
+    """
+
+            # ENHANCEMENT 2: Add context from adjacent chunks
+            chunk_text = chunk["text"]
+            if i > 0:
+                # Add the last 100 characters from previous chunk for context
+                prev_chunk_end = text_chunks[i-1]["text"][-100:] if len(text_chunks[i-1]["text"]) > 100 else text_chunks[i-1]["text"]
+                chunk_text = f"[CONTEXT FROM PREVIOUS PART: {prev_chunk_end}]\n\n{chunk_text}"
+                
+            if i < total_chunks - 1:
+                # Add the first 100 characters from next chunk for context
+                next_chunk_start = text_chunks[i+1]["text"][:100] if len(text_chunks[i+1]["text"]) > 100 else text_chunks[i+1]["text"]
+                chunk_text = f"{chunk_text}\n\n[CONTEXT FOR NEXT PART: {next_chunk_start}]"
+
             for attempt in range(settings.MAX_RETRIES):
                 try:
                     response = await self.client.chat.completions.create(
                         model=settings.MODEL,
                         messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": chunk["text"]}
+                            {"role": "system", "content": enhanced_prompt},
+                            {"role": "user", "content": chunk_text}
                         ],
                         temperature=0.7,
                         max_tokens=int(len(chunk["text"]) * 1.5)
@@ -113,11 +139,14 @@ class OpenAIService:
                     
                     if chunk_paragraphs:
                         for j, p in enumerate(chunk_paragraphs):
-                            paragraphs.append({
-                                "paragraph_number": len(paragraphs),
-                                "paragraph_text": p,
-                                "start_time": chunk["start_time"]  # Add timestamp from chunk
-                            })
+                            # ENHANCEMENT 3: Filter out context markers
+                            if not p.startswith("[CONTEXT") and not "CONTEXT]" in p:
+                                paragraphs.append({
+                                    "paragraph_number": len(paragraphs),
+                                    "paragraph_text": p,
+                                    "start_time": chunk["start_time"],
+                                    "chunk_index": i  # Add chunk index for reference
+                                })
                         successful_chunks += 1
                     break  # Break retry loop if successful
                     
@@ -148,6 +177,7 @@ class OpenAIService:
             text = "\n\n".join([p["paragraph_text"] for p in paragraphs])
             total_paragraphs = len(paragraphs)
             
+            # ENHANCEMENT 4: Improved TOC prompt for better section division
             system_prompt = f"""Create a detailed table of contents for this content.
             
             Instructions:
@@ -155,6 +185,8 @@ class OpenAIService:
             2. Each chapter should represent a coherent section of content
             3. Make chapter titles clear and descriptive
             4. Ensure chapters are evenly distributed
+            5. Look for natural topic transitions, not arbitrary divisions
+            6. Avoid creating sections that would break the flow of a step-by-step guide
             
             Format your response as JSON with this structure:
             {{
@@ -171,7 +203,10 @@ class OpenAIService:
             - Chapter titles should be descriptive and relevant
             - Each chapter should cover a distinct topic or theme
             - The first chapter should always start at paragraph 0
+            - Do not create too many small sections - aim for 3-5 substantive sections
             """
+
+            # Rest of the method remains the same...
 
             response = await self.client.chat.completions.create(
                 model=settings.MODEL,

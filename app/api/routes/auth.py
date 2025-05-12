@@ -53,8 +53,16 @@ async def login_for_access_token(
     db: Session = Depends(get_db)
 ):
     """Get access token using username and password."""
+    # Define a default expiry time to use if the setting is missing
+    try:
+        access_token_expire_minutes = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+    except AttributeError:
+        # Default to 30 minutes if the setting is missing
+        access_token_expire_minutes = 30
+    
+    access_token_expires = timedelta(minutes=access_token_expire_minutes)
+    
     # For development, we'll always return a token
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": "demo"},  # Always use "demo" user for development
         expires_delta=access_token_expires
