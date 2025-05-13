@@ -25,26 +25,30 @@
     auth.clearError();
     
     try {
-      // For development mode, use the development login
-      if (import.meta.env.DEV || window.location.hostname === 'localhost') {
-        await auth.loginDevelopment();
-        goto("/dashboard");
-        return;
-      }
-      
-      // For production, implement proper Firebase auth
-      // This is a placeholder - you would implement real Firebase login here
-      auth.setError("Firebase auth not implemented yet. In development mode, you can login without credentials.");
-      loading = false;
+      // Login with email and password (will use development login in dev mode)
+      await auth.login(email, password);
+      goto("/dashboard");
     } catch (err) {
       console.error("Login error:", err);
+      // Error is already set in the auth store
       loading = false;
     }
   }
   
-  function handleGoogleLogin() {
-    // Redirect to Google OAuth URL
-    window.location.href = "/oauth/google/login";
+  async function handleGoogleLogin() {
+    try {
+      // Try Firebase Google login first if available
+      if (import.meta.env.VITE_USE_FIREBASE_AUTH === 'true') {
+        await auth.loginWithGoogle();
+        goto("/dashboard");
+      } else {
+        // Fall back to OAuth redirect
+        window.location.href = "/oauth/google/login";
+      }
+    } catch (error) {
+      console.error("Google login error:", error);
+      // Error is already set in the auth store
+    }
   }
 </script>
 
@@ -93,6 +97,12 @@
         >
           {loading ? "Signing in..." : "Sign In"}
         </button>
+        
+        {#if import.meta.env.DEV}
+          <div class="text-center text-sm text-foreground/60 mt-2">
+            <p>In development mode, any email/password will work</p>
+          </div>
+        {/if}
       </form>
       
       <div class="mt-6">
@@ -107,11 +117,14 @@
         
         <div class="mt-4">
           <button 
-            class="w-full px-4 py-2 border border-border rounded-md hover:bg-muted"
+            class="w-full px-4 py-2 border border-border rounded-md hover:bg-muted flex items-center justify-center"
             on:click={handleGoogleLogin}
           >
-            <!-- Google icon would go here -->
-            <span>Google</span>
+            <!-- Google icon -->
+            <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24">
+              <path d="M12.545 10.239v3.821h5.445c-0.712 2.315-2.647 3.972-5.445 3.972-3.332 0-6.033-2.701-6.033-6.032s2.701-6.032 6.033-6.032c1.498 0 2.866 0.549 3.921 1.453l2.814-2.814c-1.798-1.677-4.198-2.701-6.735-2.701-5.539 0-10.032 4.493-10.032 10.032s4.493 10.032 10.032 10.032c5.539 0 9.366-3.895 9.366-9.373 0-0.703-0.077-1.377-0.219-2.017h-9.147z" fill="currentColor"></path>
+            </svg>
+            <span>Sign in with Google</span>
           </button>
         </div>
       </div>
