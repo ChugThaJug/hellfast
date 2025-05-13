@@ -226,44 +226,44 @@ function createAuthStore() {
       update(state => ({ ...state, error: null }));
     },
     
-    // Call on app initialization
-    initialize: async () => {
-      if (!browser) return;
-      
-      update(state => ({ ...state, loading: true }));
-      
-      const token = localStorage.getItem('token');
-      
-      if (!token) {
-        set({ 
-          user: null, 
-          authenticated: false, 
-          loading: false,
-          error: null 
-        });
-        return;
-      }
-      
-      try {
-        // Try to get user profile from backend
-        const user = await authApi.getProfile();
-        set({ 
-          user, 
-          authenticated: true, 
-          loading: false,
-          error: null 
-        });
-      } catch (error) {
-        console.error('Auth initialization error:', error);
-        localStorage.removeItem('token');
-        set({ 
-          user: null, 
-          authenticated: false, 
-          loading: false,
-          error: null 
-        });
-      }
+  // Excerpt from frontend/src/lib/stores/auth.ts - initialize method
+  initialize: async () => {
+    if (!browser) return;
+    
+    update(state => ({ ...state, loading: true }));
+    
+    const token = localStorage.getItem('token');
+    
+    if (!token) {
+      set({ 
+        user: null, 
+        authenticated: false, 
+        loading: false,
+        error: null 
+      });
+      return;
     }
+    
+    try {
+      // Try to get user profile from backend
+      const user = await authApi.getProfile();
+      set({ 
+        user, 
+        authenticated: true, 
+        loading: false,
+        error: null 
+      });
+    } catch (error) {
+      console.error('Auth initialization error:', error);
+      localStorage.removeItem('token');
+      set({ 
+        user: null, 
+        authenticated: false, 
+        loading: false,
+        error: null 
+      });
+    }
+  }
   };
 }
 

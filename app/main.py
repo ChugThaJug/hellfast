@@ -11,8 +11,13 @@ from app.db.database import create_tables, get_db
 from app.api.routes import auth, youtube, subscription
 from app.models.database import User
 from app.dependencies.auth import get_current_active_user
-from app.services.firebase_auth import initialize_firebase_admin  # Import the function directly
-
+# Try to use the real Firebase, fall back to stub implementation
+try:
+    from app.services.firebase_auth import initialize_firebase_admin
+except ImportError:
+    from app.services.init_firebase import initialize_firebase_admin
+    
+from app.dependencies.auth import get_current_active_user
 # Configure logging
 logging.basicConfig(
     level=settings.LOG_LEVEL,

@@ -1,11 +1,15 @@
+# app/api/routes/oauth.py
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Response
 from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from typing import Dict, Any
+import logging
 
 from app.db.database import get_db
 from app.core.settings import settings
 from app.services.oauth import GoogleOAuthService
+
+logger = logging.getLogger(__name__)
 
 # Change the prefix to avoid conflicts with auth router
 router = APIRouter(prefix="/oauth", tags=["oauth"])
@@ -18,8 +22,15 @@ async def google_login():
     Returns:
         A redirect response to Google's authentication page
     """
-    auth_url = await GoogleOAuthService.get_authorization_url()
-    return RedirectResponse(url=auth_url)
+    try:
+        auth_url = await GoogleOAuthService.get_authorization_url()
+        return RedirectResponse(url=auth_url)
+    except Exception as e:
+        logger.error(f"Error generating Google OAuth URL: {str(e)}")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"detail": f"OAuth error: {str(e)}"}
+        )
 
 @router.get("/google/callback", summary="Handle Google OAuth callback")
 async def google_callback(code: str, db: Session = Depends(get_db)):
@@ -35,7 +46,14 @@ async def google_callback(code: str, db: Session = Depends(get_db)):
         A redirect response to the frontend with the access token
     """
     try:
-        result = await GoogleOAuthService.handle_oauth_callback(db, code)
+        # Log the received code for debugging
+        logger.info("Received OAuth callback with code")
+        
+        # Use the same redirect URI that was used in the authorization request
+        redirect_uri = "http://localhost:8000/oauth/google/callback"
+        
+        # Exchange code for token using the redirect URI
+        result = await GoogleOAuthService.handle_oauth_callback(db, code, redirect_uri)
         
         if not result.get("success"):
             return JSONResponse(
@@ -50,6 +68,7 @@ async def google_callback(code: str, db: Session = Depends(get_db)):
         return RedirectResponse(url=redirect_url)
         
     except Exception as e:
+        logger.error(f"OAuth callback error: {str(e)}")
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"detail": f"OAuth error: {str(e)}"}
@@ -69,7 +88,10 @@ async def google_mobile_callback(code: str, db: Session = Depends(get_db)):
         JSON response with the access token and user information
     """
     try:
-        result = await GoogleOAuthService.handle_oauth_callback(db, code)
+        # Use the same redirect URI that was used in the authorization request
+        redirect_uri = "http://localhost:8000/oauth/google/callback"
+        
+        result = await GoogleOAuthService.handle_oauth_callback(db, code, redirect_uri)
         
         if not result.get("success"):
             return JSONResponse(
@@ -85,6 +107,7 @@ async def google_mobile_callback(code: str, db: Session = Depends(get_db)):
         }
         
     except Exception as e:
+        logger.error(f"OAuth error: {str(e)}")
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"detail": f"OAuth error: {str(e)}"}
@@ -101,5 +124,8 @@ async def oauth_status():
     is_configured = bool(settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET)
     return {
         "status": "OAuth routes are working",
-        "google_oauth_configured": is_configured
+        "google_oauth_configured": is_configured,
+        "client_id_configured": bool(settings.GOOGLE_CLIENT_ID),
+        "client_secret_configured": bool(settings.GOOGLE_CLIENT_SECRET),
+        "redirect_url": "http://localhost:8000/oauth/google/callback"
     }

@@ -38,7 +38,12 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
         expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    
+    # Make sure SECRET_KEY and ALGORITHM are defined in settings
+    secret_key = getattr(settings, "SECRET_KEY", "development-secret-key")
+    algorithm = getattr(settings, "ALGORITHM", "HS256")
+    
+    encoded_jwt = jwt.encode(to_encode, secret_key, algorithm=algorithm)
     return encoded_jwt
 
 def get_user_by_email(db: Session, email: str):

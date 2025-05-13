@@ -37,17 +37,29 @@
   
   async function handleGoogleLogin() {
     try {
-      // Try Firebase Google login first if available
+      // In development mode, use development login
+      if (import.meta.env.DEV && import.meta.env.VITE_USE_DEV_AUTH === 'true') {
+        console.log("Using development login");
+        await auth.loginDevelopment();
+        goto("/dashboard");
+        return;
+      }
+      
+      // For Firebase auth
       if (import.meta.env.VITE_USE_FIREBASE_AUTH === 'true') {
+        console.log("Using Firebase auth");
         await auth.loginWithGoogle();
         goto("/dashboard");
-      } else {
-        // Fall back to OAuth redirect
-        window.location.href = "/oauth/google/login";
-      }
+        return;
+      } 
+      
+      // For backend OAuth
+      console.log("Using backend OAuth");
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+      window.location.href = `${apiBaseUrl}/oauth/google/login`;
     } catch (error) {
       console.error("Google login error:", error);
-      // Error is already set in the auth store
+      auth.setError("Google login failed: " + (error instanceof Error ? error.message : "Unknown error"));
     }
   }
 </script>

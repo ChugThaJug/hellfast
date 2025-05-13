@@ -11,7 +11,7 @@ import os
 from app.core.settings import settings
 from app.db.database import create_tables, get_db
 from app.models.database import User
-from app.services.firebase_auth import initialize_firebase_admin
+from app.services.firebase_init import initialize_firebase_admin
 from app.dependencies.auth import get_current_active_user
 
 # Configure environment - Use environment variable instead of hard-coding

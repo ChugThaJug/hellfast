@@ -1,3 +1,4 @@
+# In app/core/settings.py
 from pydantic_settings import BaseSettings
 from typing import Dict, List, Optional
 import os
@@ -11,7 +12,6 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
 
     APP_ENV: str = os.getenv("APP_ENV", "production")  # "development" or "production"
-
     
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost/ytprocessing")
@@ -22,7 +22,6 @@ class Settings(BaseSettings):
     FIREBASE_SERVICE_ACCOUNT_KEY: str = os.getenv("FIREBASE_SERVICE_ACCOUNT_KEY", "")
 
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-
     
     # Stripe integration
     STRIPE_API_KEY: Optional[str] = os.getenv("STRIPE_API_KEY")
@@ -35,9 +34,20 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
     REPLICATE_API_TOKEN: Optional[str] = os.getenv("REPLICATE_API_TOKEN")
 
-    # Frontend URL
+# Add these lines to app/core/settings.py in the Settings class
+# Make sure FRONTEND_URL is defined BEFORE using it
+
+    # Frontend URL - Make sure this is defined before OAuth settings
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")  # SvelteKit default dev port
-    
+
+    # OAuth settings
+    GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "development-secret-key-change-in-production")
+    ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
+
+    # Use these for the backend OAuth flow
+    OAUTH_REDIRECT_URL: str = os.getenv("OAUTH_REDIRECT_URL", "http://localhost:8000/oauth/google/callback")
     # CORS Settings
     CORS_ORIGINS: List[str] = [
         "http://localhost:5173",    # SvelteKit dev server
@@ -46,6 +56,8 @@ class Settings(BaseSettings):
     ]
     CORS_METHODS: List[str] = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     CORS_HEADERS: List[str] = ["*"]
+    
+    # Rest of your settings class remains the same...
     
     # Directory settings
     CACHE_DIR: str = "cache"
