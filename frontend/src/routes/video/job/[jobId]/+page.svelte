@@ -1,8 +1,7 @@
-<!-- src/routes/video/job/[jobId]/+page.svelte -->
+<!-- frontend/src/routes/video/job/[jobId]/+page.svelte -->
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import { page } from "$app/stores";
-  import { goto } from "$app/navigation";
   import { videoApi } from "$lib/api";
   
   const jobId = $page.params.jobId;
@@ -30,7 +29,7 @@
       if (status.status === "completed") {
         clearInterval(intervalId);
         setTimeout(() => {
-          goto(`/video/${status.video_id}`);
+          window.location.href = `/video/${status.video_id}`;
         }, 1000);
       }
       

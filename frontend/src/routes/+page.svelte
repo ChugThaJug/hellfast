@@ -1,9 +1,6 @@
-<!-- src/routes/+page.svelte -->
+<!-- frontend/src/routes/+page.svelte -->
 <script lang="ts">
-  import { goto } from "$app/navigation";
-  import { Button } from "bits-ui";
   import { Search } from "lucide-svelte";
-  import { videoApi } from "$lib/api";
   
   let youtubeUrl = "";
   let processing = false;
@@ -15,19 +12,19 @@
       return;
     }
     
+    // Add processing logic here
+    processing = true;
+    error = "";
+    
     try {
-      processing = true;
-      error = "";
-      
-      const result = await videoApi.processVideo(youtubeUrl);
-      
-      // Redirect to job status page
-      goto(`/video/job/${result.job_id}`);
+      // This is a placeholder for actual API call
+      setTimeout(() => {
+        processing = false;
+        window.location.href = "/video/demo123";
+      }, 1500);
     } catch (err) {
-      console.error("Error processing video:", err);
-      error = err instanceof Error ? err.message : "An unknown error occurred";
-    } finally {
       processing = false;
+      error = "Error processing video";
     }
   }
 </script>
@@ -58,17 +55,22 @@
         type="text"
         bind:value={youtubeUrl}
         placeholder="Paste YouTube URL here"
-        class="flex-grow px-4 py-3 rounded-md border border-input focus:outline-none focus:ring-2 focus:ring-foreground"
+        class="flex-grow px-4 py-3 rounded-md border border-border focus:outline-none focus:ring-2"
       />
       
-      <Button type="submit" disabled={processing}>
+      <button 
+        type="submit" 
+        disabled={processing}
+        class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 flex items-center"
+      >
         {#if processing}
-          <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-background"></div>
+          <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground mr-2"></div>
+          <span>Processing</span>
         {:else}
           <Search class="mr-2 h-4 w-4" />
-          Process
+          <span>Process</span>
         {/if}
-      </Button>
+      </button>
     </form>
     
     <p class="mt-4 text-sm text-foreground/60">

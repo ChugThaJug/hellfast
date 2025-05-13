@@ -1,10 +1,10 @@
-<!-- src/lib/components/layout/Footer.svelte -->
+<!-- frontend/src/lib/components/layout/Footer.svelte -->
 <footer class="border-t border-border bg-background py-6">
   <div class="container px-4">
     <div class="flex flex-col md:flex-row justify-between items-center">
       <div class="mb-4 md:mb-0">
         <p class="text-sm text-foreground/60">
-          © 2025 Stepify. All rights reserved.
+          © {new Date().getFullYear()} Stepify. All rights reserved.
         </p>
       </div>
       

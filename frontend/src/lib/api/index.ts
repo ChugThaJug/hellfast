@@ -1,4 +1,6 @@
-// src/lib/api/index.ts
+// frontend/src/lib/api/index.ts
+import type { JobStatus, ProcessedVideo, SubscriptionPlan, SubscriptionStatus, User, VideoEntry } from "./schema";
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 // Helper function for authenticated requests
@@ -33,65 +35,67 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
 export const videoApi = {
   // Process a YouTube video
   processVideo: (videoUrl: string, mode: string = 'detailed', outputFormat: string = 'step_by_step') =>
-    fetchWithAuth('/youtube/process/' + extractVideoId(videoUrl), {
+    fetchWithAuth(`/youtube/process/${extractVideoId(videoUrl)}`, {
       method: 'POST',
       body: JSON.stringify({ mode, output_format: outputFormat })
     }),
   
   // Get processing job status
-  getJobStatus: (jobId: string) =>
+  getJobStatus: (jobId: string): Promise<JobStatus> =>
     fetchWithAuth(`/youtube/job-status/${jobId}`),
   
   // Get processed video result
-  getVideoResult: (videoId: string) =>
+  getVideoResult: (videoId: string): Promise<ProcessedVideo> =>
     fetchWithAuth(`/youtube/video-result/${videoId}`),
     
   // Get user videos
-  getUserVideos: () =>
-    fetchWithAuth('/youtube/user/videos')
+  getUserVideos: (): Promise<VideoEntry[]> =>
+    fetchWithAuth('/youtube/user/videos'),
+    
+  // Delete a video
+  deleteVideo: (videoId: string): Promise<{message: string}> =>
+    fetchWithAuth(`/youtube/video/${videoId}`, {
+      method: 'DELETE'
+    })
 };
 
 // Authentication API
 export const authApi = {
   // Login with Firebase token
-  loginWithFirebase: (token: string) =>
+  loginWithFirebase: (token: string): Promise<User> =>
     fetchWithAuth('/firebase/verify-token', {
       method: 'POST',
       body: JSON.stringify({ token })
     }),
   
   // Get user profile
-  getProfile: () =>
+  getProfile: (): Promise<User> =>
     fetchWithAuth('/firebase/profile'),
     
-  // Google OAuth login
-  getGoogleAuthUrl: () =>
-    fetchWithAuth('/oauth/google/login'),
-    
   // Handle OAuth callback
-  handleOAuthCallback: (code: string) =>
+  handleOAuthCallback: (code: string): Promise<{access_token: string, token_type: string, user: User}> =>
     fetchWithAuth(`/oauth/google/mobile-callback?code=${code}`)
 };
 
 // Subscription API
 export const subscriptionApi = {
   // Get subscription plans
-  getPlans: () =>
+  getPlans: (): Promise<SubscriptionPlan[]> =>
     fetchWithAuth('/subscription/plans'),
   
   // Get subscription status
-  getStatus: () =>
+  getStatus: (): Promise<SubscriptionStatus> =>
     fetchWithAuth('/subscription/status'),
   
   // Create subscription
-  createSubscription: (planId: string) =>
+  createSubscription: (planId: string): Promise<{checkout_url?: string, message?: string}> =>
     fetchWithAuth('/subscription/create', {
       method: 'POST',
       body: JSON.stringify({ plan_id: planId })
     }),
     
   // Cancel subscription
-  cancelSubscription: () =>
+  cancelSubscription: (): Promise<{message: string}> =>
     fetchWithAuth('/subscription/cancel', {
       method: 'POST'
     })
