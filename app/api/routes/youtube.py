@@ -9,6 +9,9 @@ from app.dependencies.auth import get_current_active_user, validate_api_key
 from app.services.subscription import SubscriptionService
 from app.core.settings import settings
 
+# Add at the top with other imports in app/api/routes/youtube.py
+from app.models.database import User, Video, ProcessingJob, OutputFormat, ProcessingMode
+
 router = APIRouter(prefix="/youtube", tags=["youtube"])
 
 # Initialize services

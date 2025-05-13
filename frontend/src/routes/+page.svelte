@@ -1,32 +1,7 @@
 <!-- frontend/src/routes/+page.svelte -->
 <script lang="ts">
   import { Search } from "lucide-svelte";
-  
-  let youtubeUrl = "";
-  let processing = false;
-  let error = "";
-  
-  async function handleSubmit() {
-    if (!youtubeUrl) {
-      error = "Please enter a YouTube URL";
-      return;
-    }
-    
-    // Add processing logic here
-    processing = true;
-    error = "";
-    
-    try {
-      // This is a placeholder for actual API call
-      setTimeout(() => {
-        processing = false;
-        window.location.href = "/video/demo123";
-      }, 1500);
-    } catch (err) {
-      processing = false;
-      error = "Error processing video";
-    }
-  }
+  import VideoProcessForm from "$lib/components/video/VideoProcessForm.svelte";
 </script>
 
 <svelte:head>
@@ -44,38 +19,7 @@
   </p>
   
   <div class="max-w-xl mx-auto">
-    {#if error}
-      <div class="bg-destructive/15 text-destructive px-4 py-3 rounded-md mb-4" role="alert">
-        {error}
-      </div>
-    {/if}
-    
-    <form on:submit|preventDefault={handleSubmit} class="flex gap-2">
-      <input
-        type="text"
-        bind:value={youtubeUrl}
-        placeholder="Paste YouTube URL here"
-        class="flex-grow px-4 py-3 rounded-md border border-border focus:outline-none focus:ring-2"
-      />
-      
-      <button 
-        type="submit" 
-        disabled={processing}
-        class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 flex items-center"
-      >
-        {#if processing}
-          <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground mr-2"></div>
-          <span>Processing</span>
-        {:else}
-          <Search class="mr-2 h-4 w-4" />
-          <span>Process</span>
-        {/if}
-      </button>
-    </form>
-    
-    <p class="mt-4 text-sm text-foreground/60">
-      Example: https://www.youtube.com/watch?v=dQw4w9WgXcQ
-    </p>
+    <VideoProcessForm />
   </div>
 </section>
 

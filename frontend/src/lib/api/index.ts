@@ -1,34 +1,18 @@
 // frontend/src/lib/api/index.ts
 import type { JobStatus, ProcessedVideo, SubscriptionPlan, SubscriptionStatus, User, VideoEntry } from "./schema";
+import { fetchWithAuth } from "./client";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-
-// Helper function for authenticated requests
-async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
-  const token = localStorage.getItem('token');
+// Helper function to extract video ID from YouTube URL
+function extractVideoId(url: string): string {
+  const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+  const match = url.match(regex);
   
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    ...options.headers
-  };
-  
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers
-  });
-  
-  if (!response.ok) {
-    let errorData;
-    try {
-      errorData = await response.json();
-    } catch (e) {
-      throw new Error(`HTTP error ${response.status}`);
-    }
-    throw new Error(errorData.detail || `HTTP error ${response.status}`);
+  if (match && match[1]) {
+    return match[1];
   }
   
-  return response.json();
+  // If no match is found, assume the URL is already an ID
+  return url;
 }
 
 // Video Processing API
@@ -68,6 +52,13 @@ export const authApi = {
       body: JSON.stringify({ token })
     }),
   
+  // Login for development (no token needed in dev mode)
+  loginForDevelopment: (): Promise<User> =>
+    fetchWithAuth('/firebase/verify-token', {
+      method: 'POST',
+      body: JSON.stringify({}) // Empty body will work in dev mode
+    }),
+  
   // Get user profile
   getProfile: (): Promise<User> =>
     fetchWithAuth('/firebase/profile'),
@@ -100,16 +91,3 @@ export const subscriptionApi = {
       method: 'POST'
     })
 };
-
-// Helper function to extract video ID from YouTube URL
-function extractVideoId(url: string): string {
-  const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
-  const match = url.match(regex);
-  
-  if (match && match[1]) {
-    return match[1];
-  }
-  
-  // If no match is found, assume the URL is already an ID
-  return url;
-}

@@ -1,3 +1,4 @@
+# main.py
 from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -13,9 +14,9 @@ from app.models.database import User
 from app.services.firebase_auth import initialize_firebase_admin
 from app.dependencies.auth import get_current_active_user
 
-# IMPORTANT: Force development mode
-os.environ["APP_ENV"] = "development"
-settings.APP_ENV = "development"
+# Configure environment - Use environment variable instead of hard-coding
+app_env = os.getenv("APP_ENV", "development")
+settings.APP_ENV = app_env
 
 # Configure logging
 logging.basicConfig(
@@ -24,9 +25,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Print development mode status
+# Print environment status
 logger.info(f"Running in {settings.APP_ENV} mode")
-logger.info(f"Development mode enabled: {settings.APP_ENV == 'development'}")
 
 # Startup and shutdown events
 @asynccontextmanager
@@ -42,7 +42,8 @@ async def lifespan(app: FastAPI):
             logger.info("Firebase Admin SDK initialized successfully")
         except Exception as e:
             logger.error(f"Firebase initialization failed: {str(e)}")
-            logger.info("In development mode, this is not a critical error")
+            if settings.APP_ENV == "development":
+                logger.info("In development mode, this is not a critical error")
     except Exception as e:
         logger.error(f"Error during startup: {str(e)}")
     
@@ -59,13 +60,18 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Add CORS middleware
+# Add CORS middleware - Make sure frontend URL is included in allowed origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=[
+        "http://localhost:5173",  # SvelteKit default dev port
+        "http://localhost:4173",  # SvelteKit preview
+        "http://localhost:3000",  # Alternative dev port
+        *settings.CORS_ORIGINS,
+    ],
     allow_credentials=True,
-    allow_methods=settings.CORS_METHODS,
-    allow_headers=settings.CORS_HEADERS,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Middleware for request timing
@@ -87,12 +93,13 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 # Import routers - do this AFTER app is created
-from app.api.routes import youtube, subscription, firebase_auth
+from app.api.routes import youtube, subscription, firebase_auth, oauth
 
-# Include routers - only import what we need
+# Include routers
 app.include_router(youtube.router)
 app.include_router(subscription.router)
-app.include_router(firebase_auth.router)  # Add Firebase auth routes
+app.include_router(firebase_auth.router)
+app.include_router(oauth.router)  # Make sure OAuth router is included
 
 # Root endpoint
 @app.get("/")
