@@ -48,6 +48,46 @@ class Settings(BaseSettings):
 
     # Use these for the backend OAuth flow
     OAUTH_REDIRECT_URL: str = os.getenv("OAUTH_REDIRECT_URL", "http://localhost:8000/oauth/google/callback")
+    # Add to app/core/settings.py within the Settings class
+
+    # Paddle settings
+    PADDLE_VENDOR_ID: str = os.getenv("PADDLE_VENDOR_ID", "")
+    PADDLE_API_KEY: str = os.getenv("PADDLE_API_KEY", "")
+    PADDLE_PUBLIC_KEY: str = os.getenv("PADDLE_PUBLIC_KEY", "")
+    PADDLE_SANDBOX: bool = os.getenv("PADDLE_SANDBOX", "true").lower() == "true"
+
+    # Update subscription plans
+    SUBSCRIPTION_PLANS: Dict[str, Dict] = {
+        "free": {
+            "name": "Free",
+            "price": 0,
+            "monthly_quota": 3,
+            "features": ["simple_mode", "bullet_points", "summary"],
+            "max_video_length": 10,  # in minutes
+            "paddle_plan_id": None  # Free plans don't need Paddle IDs
+        },
+        "pro": {
+            "name": "Pro",
+            "price": 4.99,
+            "yearly_price": 49.99,
+            "monthly_quota": 15,
+            "features": ["simple_mode", "detailed_mode", "bullet_points", "summary", "step_by_step"],
+            "max_video_length": 30,  # in minutes
+            "paddle_plan_id": os.getenv("PADDLE_PRO_PLAN_ID", ""),
+            "paddle_yearly_plan_id": os.getenv("PADDLE_PRO_YEARLY_PLAN_ID", "")
+        },
+        "max": {
+            "name": "Max",
+            "price": 9.99,
+            "yearly_price": 99.99,
+            "monthly_quota": 50,
+            "features": ["simple_mode", "detailed_mode", "bullet_points", "summary", "step_by_step", "podcast_article", "api_access"],
+            "max_video_length": 120,  # in minutes (2 hours)
+            "paddle_plan_id": os.getenv("PADDLE_MAX_PLAN_ID", ""),
+            "paddle_yearly_plan_id": os.getenv("PADDLE_MAX_YEARLY_PLAN_ID", "")
+        }
+    }
+    
     # CORS Settings
     CORS_ORIGINS: List[str] = [
         "http://localhost:5173",    # SvelteKit dev server

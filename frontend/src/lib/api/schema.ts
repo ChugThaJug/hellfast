@@ -45,12 +45,17 @@ export interface VideoEntry {
   updated_at: string;
 }
 
+// frontend/src/lib/api/schema.ts
+// Add or update these interfaces
+
 export interface SubscriptionPlan {
   id: string;
   name: string;
   price: number;
+  yearly_price?: number;
   monthly_quota: number;
   features: string[];
+  max_video_length?: number;
 }
 
 export interface SubscriptionStatus {
@@ -60,4 +65,5 @@ export interface SubscriptionStatus {
   monthly_quota: number;
   used_quota: number;
   features: string[];
+  max_video_length?: number;
 }

@@ -39,6 +39,8 @@ frontend/node_modules
 /.svelte-kit
 /package
 .env.*
+/.env.production
+/.env.development
 !.env.example
 .vercel
 .output

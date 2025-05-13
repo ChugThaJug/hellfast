@@ -68,6 +68,9 @@ export const authApi = {
     fetchWithAuth(`/oauth/google/mobile-callback?code=${code}`)
 };
 
+// frontend/src/lib/api/index.ts
+// Update the subscription API methods
+
 // Subscription API
 export const subscriptionApi = {
   // Get subscription plans
@@ -79,10 +82,10 @@ export const subscriptionApi = {
     fetchWithAuth('/subscription/status'),
   
   // Create subscription
-  createSubscription: (planId: string): Promise<{checkout_url?: string, message?: string}> =>
+  createSubscription: (data: {plan_id: string, yearly: boolean}): Promise<{checkout_url?: string, message?: string}> =>
     fetchWithAuth('/subscription/create', {
       method: 'POST',
-      body: JSON.stringify({ plan_id: planId })
+      body: JSON.stringify(data)
     }),
     
   // Cancel subscription
