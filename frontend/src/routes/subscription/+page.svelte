@@ -1,17 +1,37 @@
 <!-- frontend/src/routes/subscription/+page.svelte -->
-<script lang="ts">
+<script>
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { subscriptionApi } from "$lib/api";
   import { Check } from "lucide-svelte";
   import type { SubscriptionPlan, SubscriptionStatus } from "$lib/api/schema";
   import ProtectedRoute from "$lib/components/auth/ProtectedRoute.svelte";
+  import { 
+    initPaddle, 
+    loadPrices, 
+    priceMap, 
+    loadingPrices, 
+    selectedBillingFrequency,
+    selectedCountry,
+    billingFrequency,
+    openCheckout
+  } from "../../stores/paddle";
+  import { PricingTiers, BillingFrequency } from "../../constants/pricing";
+  import { auth } from "$lib/stores/auth";
   
   let plans: SubscriptionPlan[] = [];
   let currentStatus: SubscriptionStatus | null = null;
   let loading = true;
+  let processing = false;
   let error: string | null = null;
   let yearlyBilling = false;
+  
+  // Get all price IDs for price preview
+  let allPriceIds = [];
+  PricingTiers.forEach(tier => {
+    allPriceIds.push(tier.priceId.month);
+    allPriceIds.push(tier.priceId.year);
+  });
   
   // Function to format price with currency
   function formatPrice(price: number): string {
@@ -31,26 +51,11 @@
   
   onMount(async () => {
     try {
-      // Load Paddle.js if not in development mode
-      if (import.meta.env.PROD || import.meta.env.VITE_USE_PADDLE === 'true') {
-        const paddleScript = document.createElement('script');
-        paddleScript.src = 'https://cdn.paddle.com/paddle/paddle.js';
-        paddleScript.async = true;
-        document.body.appendChild(paddleScript);
-        
-        paddleScript.onload = () => {
-          const sandbox = import.meta.env.VITE_PADDLE_SANDBOX === 'true';
-          // @ts-ignore - Paddle global is loaded by the script
-          window.Paddle.Environment.set(sandbox ? 'sandbox' : 'production');
-          // @ts-ignore
-          window.Paddle.Setup({ 
-            vendor: import.meta.env.VITE_PADDLE_VENDOR_ID
-          });
-          console.log('Paddle initialized');
-        };
-      }
+      // Initialize Paddle and load prices
+      await initPaddle();
+      await loadPrices(allPriceIds, $selectedCountry);
       
-      // Get plans and status
+      // Get plans and status from API
       const [plansData, statusData] = await Promise.all([
         subscriptionApi.getPlans(),
         subscriptionApi.getStatus()
@@ -67,11 +72,23 @@
     } finally {
       loading = false;
     }
+    
+    // Listen for country changes
+    const unsubscribe = selectedCountry.subscribe(async (country) => {
+      await loadPrices(allPriceIds, country);
+    });
+    
+    return () => {
+      unsubscribe();
+    };
   });
   
   async function selectPlan(planId: string) {
+    if (processing) return;
+    
     try {
-      console.log(`Selecting plan: ${planId}, yearly: ${yearlyBilling}`);
+      processing = true;
+      error = null;
       
       // For free plan, just create subscription directly
       if (planId === 'free') {
@@ -102,24 +119,34 @@
       else if (result.message) {
         console.log('Subscription created:', result.message);
         window.location.reload();
+      } else {
+        throw new Error("No checkout URL or message returned from subscription API");
       }
     } catch (err) {
       console.error('Error creating subscription:', err);
       error = err instanceof Error ? err.message : "Failed to process subscription";
+    } finally {
+      processing = false;
     }
   }
   
   async function cancelCurrentSubscription() {
+    if (processing) return;
+    
     if (!confirm('Are you sure you want to cancel your subscription? You will be downgraded to the free plan.')) {
       return;
     }
     
     try {
+      processing = true;
+      error = null;
       const result = await subscriptionApi.cancelSubscription();
       alert(result.message);
       window.location.reload();
     } catch (err) {
       error = err instanceof Error ? err.message : "Failed to cancel subscription";
+    } finally {
+      processing = false;
     }
   }
 </script>
@@ -138,18 +165,18 @@
     <!-- Billing toggle -->
     <div class="flex justify-center mb-8">
       <div class="flex items-center p-1 bg-muted rounded-full">
-        <button 
-          class={`px-4 py-2 rounded-full transition ${!yearlyBilling ? 'bg-background shadow-sm' : ''}`}
-          on:click={() => yearlyBilling = false}
-        >
-          Monthly
-        </button>
-        <button 
-          class={`px-4 py-2 rounded-full transition ${yearlyBilling ? 'bg-background shadow-sm' : ''}`}
-          on:click={() => yearlyBilling = true}
-        >
-          Yearly <span class="text-sm text-green-500">Save 16%</span>
-        </button>
+        {#each BillingFrequency as frequency}
+          <button 
+            class={`px-4 py-2 rounded-full transition ${$selectedBillingFrequency === frequency.value ? 'bg-background shadow-sm' : ''}`}
+            on:click={() => selectedBillingFrequency.set(frequency.value)}
+            disabled={processing}
+          >
+            {frequency.label}
+            {#if frequency.value === 'year'}
+              <span class="text-sm text-green-500">Save 16%</span>
+            {/if}
+          </button>
+        {/each}
       </div>
     </div>
     
@@ -190,11 +217,16 @@
               <p class="text-foreground/70 mb-6">Process up to {plan.monthly_quota} videos per month</p>
               
               <button 
-                class={`w-full mb-6 py-2 px-4 rounded-md transition ${index === 1 ? 'bg-primary text-white hover:bg-primary/90' : 'border border-primary text-primary hover:bg-primary/10'}`}
+                class={`w-full mb-6 py-2 px-4 rounded-md transition ${processing ? 'opacity-70 cursor-not-allowed' : ''} ${index === 1 ? 'bg-primary text-white hover:bg-primary/90' : 'border border-primary text-primary hover:bg-primary/10'}`}
                 on:click={() => selectPlan(plan.id)}
-                disabled={currentStatus?.plan_id === plan.id}
+                disabled={currentStatus?.plan_id === plan.id || processing}
               >
-                {#if currentStatus?.plan_id === plan.id}
+                {#if processing}
+                  <span class="flex items-center justify-center">
+                    <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
+                    Processing...
+                  </span>
+                {:else if currentStatus?.plan_id === plan.id}
                   Current Plan
                 {:else if plan.id === 'free'}
                   Start for Free
@@ -222,24 +254,6 @@
                   <li class="flex items-center">
                     <Check class="h-4 w-4 text-primary mr-2" />
                     <span>Videos up to {plan.max_video_length} minutes</span>
-                  </li>
-                {/if}
-                
-                {#if plan.id === 'pro'}
-                  <li class="flex items-center">
-                    <Check class="h-4 w-4 text-primary mr-2" />
-                    <span>Email support</span>
-                  </li>
-                {/if}
-                
-                {#if plan.id === 'max'}
-                  <li class="flex items-center">
-                    <Check class="h-4 w-4 text-primary mr-2" />
-                    <span>Priority support</span>
-                  </li>
-                  <li class="flex items-center">
-                    <Check class="h-4 w-4 text-primary mr-2" />
-                    <span>API access (200 requests/month)</span>
                   </li>
                 {/if}
               </ul>
@@ -273,14 +287,40 @@
           
           <div class="pt-4">
             <button 
-              class="px-4 py-2 border border-destructive text-destructive rounded-md hover:bg-destructive/10 transition"
+              class={`px-4 py-2 border border-destructive text-destructive rounded-md hover:bg-destructive/10 transition ${processing ? 'opacity-70 cursor-not-allowed' : ''}`}
               on:click={cancelCurrentSubscription}
+              disabled={processing}
             >
-              Cancel Subscription
+              {#if processing}
+                <span class="flex items-center justify-center">
+                  <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
+                  Processing...
+                </span>
+              {:else}
+                Cancel Subscription
+              {/if}
             </button>
           </div>
         </div>
       </div>
     {/if}
+    
+    <!-- Country selector for localized pricing -->
+    <div class="mt-16 text-center">
+      <div class="inline-flex items-center bg-muted/30 px-4 py-2 rounded-md">
+        <span class="mr-2">Preview localized prices:</span>
+        <select 
+          bind:value={$selectedCountry}
+          class="bg-background/20 border border-border/30 rounded px-2 py-1 text-sm"
+        >
+          <option value="US">United States</option>
+          <option value="GB">United Kingdom</option>
+          <option value="DE">Germany</option>
+          <option value="FR">France</option>
+          <option value="CA">Canada</option>
+          <option value="AU">Australia</option>
+        </select>
+      </div>
+    </div>
   </div>
 </ProtectedRoute>

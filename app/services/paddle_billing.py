@@ -1,43 +1,50 @@
-# app/services/paddle.py
-import json
+# app/services/paddle_billing.py
 import logging
-import hmac
-import hashlib
+import json
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from sqlalchemy.orm import Session
-import httpx
 
 from app.core.settings import settings
 from app.models.database import Subscription, User
+from paddle_billing import Client, Environment, Options
 
 logger = logging.getLogger(__name__)
 
-class PaddleService:
-    """Service for Paddle payment processing and subscription management."""
+class PaddleBillingService:
+    """Service for Paddle Billing API integration."""
     
     @staticmethod
-    def verify_webhook_signature(raw_body: bytes, signature: str, secret: str) -> bool:
+    def get_client():
+        """Get Paddle client instance."""
+        try:
+            # Initialize Paddle client with settings
+            env = Environment.SANDBOX if settings.PADDLE_SANDBOX else Environment.PRODUCTION
+            client = Client(settings.PADDLE_API_KEY, options=Options(env))
+            return client
+        except Exception as e:
+            logger.error(f"Failed to initialize Paddle client: {str(e)}")
+            return None
+    
+    @staticmethod
+    def verify_webhook_signature(raw_body: bytes, signature: str) -> bool:
         """
-        Verify Paddle webhook signature using the raw request body and HMAC.
+        Verify Paddle webhook signature using SDK.
         """
-        if not secret:
+        if not settings.PADDLE_WEBHOOK_SECRET:
             logger.warning("No Paddle webhook secret configured for verification")
             return False
         
         try:
-            # Basic HMAC verification
-            computed_hmac = hmac.new(
-                secret.encode('utf-8'),
-                raw_body,
-                hashlib.sha256
-            ).hexdigest()
-            
-            # Extract received signature from header
-            # Paddle's signature format: ts=1234567890,h=hash
-            received_signature = signature.split(',')[0].split('=')[1]
-            
-            return hmac.compare_digest(computed_hmac, received_signature)
+            client = PaddleBillingService.get_client()
+            if not client:
+                return False
+                
+            # Use Paddle SDK to verify webhook
+            return client.webhooks.verify(
+                raw_body.decode('utf-8'), 
+                signature
+            )
         except Exception as e:
             logger.error(f"Error verifying webhook signature: {str(e)}")
             return False
@@ -54,17 +61,6 @@ class PaddleService:
         """
         Create a Paddle checkout session.
         """
-        if not settings.PADDLE_API_KEY:
-            logger.error("Paddle API key not configured")
-            return None
-            
-        # In development mode without real API key, return a mock URL
-        if settings.APP_ENV == "development":
-            # For development mode, just return a mock checkout URL
-            mock_url = f"https://checkout.paddle.com/checkout/custom/dev-checkout?user={user_id}&plan={plan_id}&yearly={is_yearly}"
-            logger.info(f"Development mode - using mock checkout URL: {mock_url}")
-            return mock_url
-            
         try:
             # Get the appropriate plan data
             plan_data = None
@@ -77,34 +73,40 @@ class PaddleService:
                 logger.error(f"Invalid plan ID: {plan_id}")
                 return None
                 
-            # Get the Paddle plan ID (price ID in Paddle Billing)
-            paddle_plan_id = None
+            # Get the Paddle price ID
+            price_id = None
             if is_yearly and "paddle_yearly_plan_id" in plan_data:
-                paddle_plan_id = plan_data["paddle_yearly_plan_id"]
+                price_id = plan_data["paddle_yearly_plan_id"]
             elif "paddle_plan_id" in plan_data:
-                paddle_plan_id = plan_data["paddle_plan_id"]
+                price_id = plan_data["paddle_plan_id"]
             
-            if not paddle_plan_id:
-                logger.error(f"No Paddle plan ID configured for {plan_id}")
+            if not price_id:
+                logger.error(f"No Paddle price ID configured for {plan_id}")
+                # In development mode, use mock checkout
+                if settings.APP_ENV == "development":
+                    return f"https://checkout.paddle.com/checkout/custom/dev-checkout?user={user_id}&plan={plan_id}&yearly={is_yearly}"
                 return None
             
-            # For development, use mock URL
-            if settings.APP_ENV == "development":
+            # If in development mode with no API key, return mock URL
+            if settings.APP_ENV == "development" and not settings.PADDLE_API_KEY:
                 return f"https://checkout.paddle.com/checkout/custom/dev-checkout?user={user_id}&plan={plan_id}&yearly={is_yearly}"
             
-            # For production, make real API call
-            # Determine API base URL based on sandbox setting
-            base_url = "https://sandbox-api.paddle.com" if settings.PADDLE_SANDBOX else "https://api.paddle.com"
+            # Create checkout with Paddle SDK
+            client = PaddleBillingService.get_client()
+            if not client:
+                logger.error("Failed to initialize Paddle client")
+                return None
+                
+            logger.info(f"Creating checkout for price_id: {price_id}, email: {user_email}")
             
-            # Create checkout data
+            # Build checkout data
             checkout_data = {
                 "items": [
                     {
-                        "price_id": paddle_plan_id,
+                        "price_id": price_id,
                         "quantity": 1
                     }
                 ],
-                "customer_id": f"user_{user_id}",
                 "customer_email": user_email,
                 "custom_data": {
                     "user_id": str(user_id),
@@ -115,33 +117,21 @@ class PaddleService:
             # Add success and cancel URLs if provided
             if success_url:
                 checkout_data["success_url"] = success_url
+            
             if cancel_url:
                 checkout_data["cancel_url"] = cancel_url
+                
+            # Create checkout
+            checkout = client.checkout.create(**checkout_data)
             
-            # Make API request to create checkout
-            try:
-                async with httpx.AsyncClient() as client:
-                    response = await client.post(
-                        f"{base_url}/checkout",
-                        json=checkout_data,
-                        headers={
-                            "Authorization": f"Bearer {settings.PADDLE_API_KEY}",
-                            "Content-Type": "application/json"
-                        }
-                    )
-                    
-                    if response.status_code != 200:
-                        logger.error(f"Paddle API error: {response.text}")
-                        return None
-                        
-                    data = response.json()
-                    return data.get("checkout_url")
-            except Exception as e:
-                logger.error(f"Error making Paddle API request: {str(e)}")
-                return None
+            logger.info(f"Created checkout: {checkout.url}")
+            return checkout.url
             
         except Exception as e:
             logger.error(f"Error creating Paddle checkout: {str(e)}")
+            # Fallback for development
+            if settings.APP_ENV == "development":
+                return f"https://checkout.paddle.com/checkout/custom/dev-checkout?user={user_id}&plan={plan_id}&yearly={is_yearly}"
             return None
     
     @staticmethod
@@ -238,86 +228,36 @@ class PaddleService:
         except Exception as e:
             logger.error(f"Error handling subscription created: {str(e)}")
             return None
-    
+            
     @staticmethod
-    async def handle_subscription_cancelled(db: Session, event_data: Dict[str, Any]) -> None:
+    async def get_subscription(subscription_id: str):
         """
-        Handle subscription cancelled event.
+        Get subscription details from Paddle.
         """
         try:
-            # Extract subscription ID
-            subscription_data = event_data.get("data", {})
-            subscription_id = subscription_data.get("id")
-            
-            if not subscription_id:
-                logger.error("No subscription ID found in event data")
-                return
-            
-            # Find subscription
-            subscription = db.query(Subscription).filter(
-                Subscription.paddle_subscription_id == subscription_id
-            ).first()
-            
-            if not subscription:
-                logger.warning(f"Subscription not found for cancellation: {subscription_id}")
-                return
+            client = PaddleBillingService.get_client()
+            if not client:
+                return None
                 
-            # Update status
-            subscription.status = "cancelled"
-            db.commit()
-            
-            # Create free tier subscription
-            from app.services.subscription import SubscriptionService
-            await SubscriptionService.create_subscription(
-                db,
-                subscription.user_id,
-                "free"
+            return client.subscriptions.get(subscription_id)
+        except Exception as e:
+            logger.error(f"Error getting subscription {subscription_id}: {str(e)}")
+            return None
+    
+    @staticmethod
+    async def cancel_subscription(subscription_id: str, effective: str = "next_billing_period"):
+        """
+        Cancel a subscription in Paddle.
+        """
+        try:
+            client = PaddleBillingService.get_client()
+            if not client:
+                return None
+                
+            return client.subscriptions.cancel(
+                subscription_id,
+                effective_from=effective
             )
-            
         except Exception as e:
-            logger.error(f"Error handling subscription cancelled: {str(e)}")
-    
-    @staticmethod
-    async def handle_subscription_updated(db: Session, event_data: Dict[str, Any]) -> None:
-        """
-        Handle subscription updated event.
-        """
-        try:
-            # Extract subscription data
-            subscription_data = event_data.get("data", {})
-            subscription_id = subscription_data.get("id")
-            status = subscription_data.get("status", "").lower()
-            
-            if not subscription_id:
-                logger.error("No subscription ID found in event data")
-                return
-            
-            # Find subscription
-            subscription = db.query(Subscription).filter(
-                Subscription.paddle_subscription_id == subscription_id
-            ).first()
-            
-            if not subscription:
-                logger.warning(f"Subscription not found for update: {subscription_id}")
-                return
-                
-            # Update status
-            if status:
-                subscription.status = status
-            
-            # Try to extract billing period
-            billing_period = subscription_data.get("current_billing_period", {})
-            if billing_period:
-                ends_at = billing_period.get("ends_at")
-                if ends_at:
-                    try:
-                        ends_at_dt = datetime.fromisoformat(ends_at.replace('Z', '+00:00'))
-                        subscription.current_period_end = ends_at_dt
-                    except:
-                        # Ignore parse errors
-                        pass
-                    
-            db.commit()
-            
-        except Exception as e:
-            logger.error(f"Error handling subscription updated: {str(e)}")
+            logger.error(f"Error canceling subscription {subscription_id}: {str(e)}")
+            return None

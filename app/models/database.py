@@ -22,9 +22,10 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
     username = Column(String, unique=True)
-    firebase_uid = Column(String, unique=True, index=True, nullable=True)  # Firebase User ID
-    display_name = Column(String, nullable=True)  # From Firebase profile
-    photo_url = Column(String, nullable=True)  # From Firebase profile
+    # Add the google_id column if it's not already there
+    google_id = Column(String, unique=True, nullable=True)  # Google ID for OAuth
+    display_name = Column(String, nullable=True)
+    photo_url = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     is_active = Column(Boolean, default=True)

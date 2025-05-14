@@ -1,3 +1,4 @@
+# main.py
 from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -5,19 +6,17 @@ import logging
 import time
 from contextlib import asynccontextmanager
 from sqlalchemy.orm import Session
+import os
 
 from app.core.settings import settings
 from app.db.database import create_tables, get_db
-from app.api.routes import auth, youtube, subscription
 from app.models.database import User
 from app.dependencies.auth import get_current_active_user
-# Try to use the real Firebase, fall back to stub implementation
-try:
-    from app.services.firebase_auth import initialize_firebase_admin
-except ImportError:
-    from app.services.init_firebase import initialize_firebase_admin
-    
-from app.dependencies.auth import get_current_active_user
+
+# Configure environment - Use environment variable
+app_env = os.getenv("APP_ENV", "development")
+settings.APP_ENV = app_env
+
 # Configure logging
 logging.basicConfig(
     level=settings.LOG_LEVEL,
@@ -25,20 +24,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Print environment status
+logger.info(f"Running in {settings.APP_ENV} mode")
+
 # Startup and shutdown events
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Create database tables and initialize Firebase
+    # Startup: Create database tables
     try:
         create_tables()
         logger.info("Database tables created successfully")
-        
-        # Initialize Firebase Admin SDK
-        try:
-            initialize_firebase_admin()
-            logger.info("Firebase Admin SDK initialized successfully")
-        except Exception as e:
-            logger.error(f"Firebase initialization failed: {str(e)}")
     except Exception as e:
         logger.error(f"Error during startup: {str(e)}")
     
@@ -55,13 +50,18 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Add CORS middleware
+# Add CORS middleware - Make sure frontend URL is included
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=[
+        "http://localhost:5173",  # SvelteKit default dev port
+        "http://localhost:4173",  # SvelteKit preview
+        "http://localhost:3000",  # Alternative dev port
+        *settings.CORS_ORIGINS,
+    ],
     allow_credentials=True,
-    allow_methods=settings.CORS_METHODS,
-    allow_headers=settings.CORS_HEADERS,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Middleware for request timing
@@ -82,14 +82,15 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "An unexpected error occurred. Please try again later."}
     )
 
-# Import Firebase router after defining main app
-from app.api.routes import firebase_auth
+# Import routers - do this AFTER app is created
+from app.api.routes import youtube, subscription, oauth
+from app.api.routes.auth_api import router as auth_router
 
 # Include routers
-app.include_router(auth.router)  # Keep for backward compatibility
 app.include_router(youtube.router)
 app.include_router(subscription.router)
-app.include_router(firebase_auth.router)  # Add Firebase auth routes
+app.include_router(oauth.router)
+app.include_router(auth_router)
 
 # Root endpoint
 @app.get("/")
@@ -97,7 +98,8 @@ async def root():
     return {
         "app": settings.APP_TITLE,
         "version": settings.APP_VERSION,
-        "status": "running"
+        "status": "running",
+        "environment": settings.APP_ENV
     }
 
 # Health check endpoint
@@ -105,7 +107,8 @@ async def root():
 async def health_check():
     return {
         "status": "healthy",
-        "app_version": settings.APP_VERSION
+        "app_version": settings.APP_VERSION,
+        "environment": settings.APP_ENV
     }
 
 # User profile endpoint
@@ -119,21 +122,30 @@ async def get_profile(
     # Get subscription features
     subscription_features = await SubscriptionService.get_subscription_features(db, current_user.id)
     
-    return {
+    # Build response with only fields that exist
+    profile = {
         "id": current_user.id,
         "username": current_user.username,
         "email": current_user.email,
-        "display_name": getattr(current_user, "display_name", None),
-        "photo_url": getattr(current_user, "photo_url", None),
         "created_at": current_user.created_at.isoformat(),
         "subscription": {
             "plan": subscription_features["plan"],
             "quota": subscription_features["quota"],
             "features": subscription_features["features"]
-        }
+        },
+        "development_mode": settings.APP_ENV == "development"
     }
+    
+    # Add optional fields if they exist
+    if hasattr(current_user, 'display_name') and current_user.display_name:
+        profile["display_name"] = current_user.display_name
+    if hasattr(current_user, 'photo_url') and current_user.photo_url:
+        profile["photo_url"] = current_user.photo_url
+    
+    return profile
 
 if __name__ == "__main__":
     import uvicorn
     logger.info("Starting YouTube Processing API...")
+    logger.info(f"Running in {settings.APP_ENV} mode")
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

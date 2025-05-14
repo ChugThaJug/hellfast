@@ -11,7 +11,6 @@ import os
 from app.core.settings import settings
 from app.db.database import create_tables, get_db
 from app.models.database import User
-from app.services.firebase_init import initialize_firebase_admin
 from app.dependencies.auth import get_current_active_user
 
 # Configure environment - Use environment variable instead of hard-coding
@@ -31,19 +30,10 @@ logger.info(f"Running in {settings.APP_ENV} mode")
 # Startup and shutdown events
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Create database tables and initialize Firebase
+    # Startup: Create database tables
     try:
         create_tables()
         logger.info("Database tables created successfully")
-        
-        # Initialize Firebase Admin SDK
-        try:
-            initialize_firebase_admin()
-            logger.info("Firebase Admin SDK initialized successfully")
-        except Exception as e:
-            logger.error(f"Firebase initialization failed: {str(e)}")
-            if settings.APP_ENV == "development":
-                logger.info("In development mode, this is not a critical error")
     except Exception as e:
         logger.error(f"Error during startup: {str(e)}")
     
@@ -60,7 +50,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Add CORS middleware - Make sure frontend URL is included in allowed origins
+# Add CORS middleware - Make sure frontend URL is included
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -92,14 +82,16 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "An unexpected error occurred. Please try again later."}
     )
 
+# In main.py, update the imports section
 # Import routers - do this AFTER app is created
-from app.api.routes import youtube, subscription, firebase_auth, oauth
+from app.api.routes import youtube, subscription, oauth
+from app.api.routes.auth_api import router as auth_router
 
 # Include routers
 app.include_router(youtube.router)
 app.include_router(subscription.router)
-app.include_router(firebase_auth.router)
-app.include_router(oauth.router)  # Make sure OAuth router is included
+app.include_router(oauth.router)
+app.include_router(auth_router)
 
 # Root endpoint
 @app.get("/")
@@ -145,13 +137,11 @@ async def get_profile(
         "development_mode": settings.APP_ENV == "development"
     }
     
-    # Add Firebase fields if they exist
+    # Add optional fields if they exist
     if hasattr(current_user, 'display_name') and current_user.display_name:
         profile["display_name"] = current_user.display_name
     if hasattr(current_user, 'photo_url') and current_user.photo_url:
         profile["photo_url"] = current_user.photo_url
-    if hasattr(current_user, 'firebase_uid') and current_user.firebase_uid:
-        profile["firebase_uid"] = current_user.firebase_uid
     
     return profile
 

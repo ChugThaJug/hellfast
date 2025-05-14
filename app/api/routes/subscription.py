@@ -102,6 +102,7 @@ async def get_subscription_status(
         "max_video_length": plan_data.get("max_video_length")
     }
 
+# In app/api/routes/subscription.py
 @router.post("/create", response_model=Dict)
 async def create_subscription(
     subscription_data: SubscriptionCreate,

@@ -45,31 +45,33 @@ export const videoApi = {
 
 // Authentication API
 export const authApi = {
-  // Login with Firebase token
-  loginWithFirebase: (token: string): Promise<User> =>
-    fetchWithAuth('/firebase/verify-token', {
+  // Verify token with backend
+  verifyToken: (token: string): Promise<User> =>
+    fetchWithAuth('/auth/verify-token', {
       method: 'POST',
       body: JSON.stringify({ token })
     }),
   
-  // Login for development (no token needed in dev mode)
-  loginForDevelopment: (): Promise<User> =>
-    fetchWithAuth('/firebase/verify-token', {
+  // Get user profile
+  getProfile: (): Promise<User> =>
+    fetchWithAuth('/auth/profile'),
+  
+  // Development login (no token needed in dev mode)
+  devLogin: (): Promise<User> =>
+    fetchWithAuth('/auth/verify-token', {
       method: 'POST',
       body: JSON.stringify({}) // Empty body will work in dev mode
     }),
-  
-  // Get user profile
-  getProfile: (): Promise<User> =>
-    fetchWithAuth('/firebase/profile'),
     
   // Handle OAuth callback
   handleOAuthCallback: (code: string): Promise<{access_token: string, token_type: string, user: User}> =>
-    fetchWithAuth(`/oauth/google/mobile-callback?code=${code}`)
+    fetchWithAuth(`/oauth/google/mobile-callback?code=${code}`, {
+      skipAuth: true // No auth needed for this endpoint
+    })
 };
 
 // frontend/src/lib/api/index.ts
-// Update the subscription API methods
+// Make sure this section is updated or added
 
 // Subscription API
 export const subscriptionApi = {

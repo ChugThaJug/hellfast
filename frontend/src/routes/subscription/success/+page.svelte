@@ -4,6 +4,7 @@
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import ProtectedRoute from "$lib/components/auth/ProtectedRoute.svelte";
+  import { CheckCircle2 } from "lucide-svelte";
   
   let planId = '';
   
@@ -31,9 +32,7 @@
   <div class="container mx-auto px-4 py-16">
     <div class="max-w-md mx-auto bg-background border rounded-lg p-8 shadow-sm text-center">
       <div class="w-16 h-16 bg-green-100 text-green-700 mx-auto rounded-full flex items-center justify-center mb-4">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-        </svg>
+        <CheckCircle2 class="h-8 w-8" />
       </div>
       
       <h1 class="text-2xl font-bold mb-2">Subscription Activated!</h1>

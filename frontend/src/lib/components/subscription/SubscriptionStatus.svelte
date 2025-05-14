@@ -1,0 +1,85 @@
+<!-- frontend/src/lib/components/subscription/SubscriptionStatus.svelte -->
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { subscriptionApi } from '$lib/api';
+  import type { SubscriptionStatus } from '$lib/api/schema';
+  
+  export let minimal = false; // Set to true for a minimal display
+  
+  let status: SubscriptionStatus | null = null;
+  let loading = true;
+  let error: string | null = null;
+  
+  onMount(async () => {
+    try {
+      status = await subscriptionApi.getStatus();
+    } catch (err) {
+      error = err instanceof Error ? err.message : "Failed to load subscription status";
+    } finally {
+      loading = false;
+    }
+  });
+  
+  // Format the date
+  function formatDate(dateStr: string): string {
+    return new Date(dateStr).toLocaleDateString();
+  }
+  
+  // Calculate progress percentage for quota usage
+  function calculateUsagePercentage(): number {
+    if (!status) return 0;
+    return (status.used_quota / status.monthly_quota) * 100;
+  }
+</script>
+
+{#if loading}
+  <div class="py-2">
+    <div class="h-4 w-24 bg-muted animate-pulse rounded"></div>
+  </div>
+{:else if error}
+  <div class="text-destructive text-sm">{error}</div>
+{:else if status}
+  {#if minimal}
+    <div class="flex items-center gap-2">
+      <span class="bg-primary/20 text-primary px-2 py-0.5 rounded-full text-xs">
+        {status.plan_id.charAt(0).toUpperCase() + status.plan_id.slice(1)}
+      </span>
+      <span class="text-sm text-foreground/60">
+        {status.used_quota}/{status.monthly_quota} videos
+      </span>
+    </div>
+  {:else}
+    <div class="p-4 border rounded-lg bg-background">
+      <div class="flex justify-between items-center mb-3">
+        <h3 class="font-medium">Your Subscription</h3>
+        <a href="/subscription" class="text-sm text-primary hover:underline">Manage</a>
+      </div>
+      
+      <div class="space-y-3">
+        <div>
+          <p class="text-sm text-foreground/60 mb-1">Plan</p>
+          <p class="font-medium">{status.plan_id.charAt(0).toUpperCase() + status.plan_id.slice(1)}</p>
+        </div>
+        
+        <div>
+          <p class="text-sm text-foreground/60 mb-1">Videos Usage</p>
+          <div class="w-full bg-muted rounded-full h-2 mb-1">
+            <div 
+              class="bg-primary h-2 rounded-full transition-all duration-300"
+              style={`width: ${calculateUsagePercentage()}%`}
+            ></div>
+          </div>
+          <p class="text-xs">{status.used_quota} of {status.monthly_quota} videos used</p>
+        </div>
+        
+        {#if status.plan_id !== 'free'}
+          <div>
+            <p class="text-sm text-foreground/60 mb-1">Current Period Ends</p>
+            <p class="font-medium">{formatDate(status.current_period_end)}</p>
+          </div>
+        {/if}
+      </div>
+    </div>
+  {/if}
+{/if}

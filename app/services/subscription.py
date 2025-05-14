@@ -49,6 +49,9 @@ class SubscriptionService:
         logger.info(f"Created free subscription for user {user_id}")
         return subscription
     
+# In app/services/subscription.py
+# Method for creating a new subscription
+
     @staticmethod
     async def create_subscription(db: Session, user_id: int, plan_id: str, stripe_customer_id: Optional[str] = None) -> Subscription:
         """Create or update a subscription."""

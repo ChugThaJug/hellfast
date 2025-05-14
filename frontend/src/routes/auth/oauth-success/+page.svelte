@@ -20,12 +20,12 @@
         return;
       }
       
-      console.log("Access token received, initializing auth...");
+      console.log("Access token received, logging in...");
       
-      // Store token in local storage
-      localStorage.setItem("token", accessToken);
+      // Store token in localStorage
+      localStorage.setItem('token', accessToken);
       
-      // Initialize auth with token
+      // Initialize auth with the new token
       await auth.initialize();
       
       // Redirect to dashboard
@@ -56,7 +56,7 @@
         <p class="text-foreground/70 mb-4">{error}</p>
         <a 
           href="/auth/login" 
-          class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+          class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 inline-block"
         >
           Back to Login
         </a>

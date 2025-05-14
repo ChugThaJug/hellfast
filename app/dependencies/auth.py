@@ -3,6 +3,7 @@ from fastapi import Depends, HTTPException, status, Request, Header
 from sqlalchemy.orm import Session
 import logging
 from typing import Optional
+import jwt
 
 from app.db.database import get_db
 from app.models.database import User
@@ -10,64 +11,14 @@ from app.core.settings import settings
 
 logger = logging.getLogger(__name__)
 
-# Development-friendly authentication
-class DevAuthService:
-    @staticmethod
-    def create_demo_user(db: Session) -> User:
-        """Create a demo user for development."""
-        from datetime import datetime
-        
-        # Check if demo user exists
-        demo_user = db.query(User).filter(User.username == "demo").first()
-        if demo_user:
-            return demo_user
-                
-        # Create a new demo user
-        demo_user = User(
-            username="demo",
-            email="demo@example.com",
-            is_active=True,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
-        )
-        
-        # Add optional fields if they exist
-        if hasattr(User, 'firebase_uid'):
-            demo_user.firebase_uid = "demo_firebase_uid"
-        if hasattr(User, 'display_name'):
-            demo_user.display_name = "Demo User"
-        if hasattr(User, 'photo_url'):
-            demo_user.photo_url = "https://ui-avatars.com/api/?name=Demo+User"
-        if hasattr(User, 'google_id'):
-            demo_user.google_id = "demo_google_id"
-                
-        db.add(demo_user)
-        db.commit()
-        db.refresh(demo_user)
-        return demo_user
-
-# Try to import real Firebase, fall back to development version
-try:
-    from app.services.firebase_auth import FirebaseAuthService
-    firebase_service = FirebaseAuthService
-    logger.info("Using real Firebase Authentication service")
-except ImportError:
-    logger.warning("Firebase not available, using development service")
-    firebase_service = DevAuthService
-
 async def get_current_user(
     authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ) -> User:
     """
-    Get current user from Firebase ID token or return demo user in development.
+    Get current user from JWT token.
     """
-    # Always use demo user in development mode
-    if settings.APP_ENV == "development":
-        logger.info("Using demo user for development environment")
-        return firebase_service.create_demo_user(db)
-    
-    # Production mode requires valid authentication
+    # Require valid authentication
     if not authorization:
         logger.warning("No authorization header provided")
         raise HTTPException(
@@ -86,17 +37,45 @@ async def get_current_user(
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
-        # Verify Firebase token (only in production)
-        user = await firebase_service.get_user_by_token(db, token)
-        
-        if not user:
+        # Verify token
+        try:
+            payload = jwt.decode(
+                token, 
+                settings.SECRET_KEY, 
+                algorithms=[settings.ALGORITHM]
+            )
+            email = payload.get("sub")
+            user_id = payload.get("user_id")
+            
+            if not email and not user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid token content",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+                
+            # Get user from database
+            if user_id:
+                user = db.query(User).filter(User.id == user_id).first()
+            else:
+                user = db.query(User).filter(User.email == email).first()
+                
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="User not found",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+                
+            return user
+                
+        except jwt.PyJWTError:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Could not validate credentials",
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
-        return user
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -124,16 +103,34 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
         )
     return current_user
     
-# For backwards compatibility with API keys
+# For API key authentication
 async def validate_api_key(api_key: str, db: Session) -> User:
     """Validate API key and return user."""
-    logger.info("API key validation requested - using demo user in development mode")
-    if settings.APP_ENV == "development":
-        return firebase_service.create_demo_user(db)
+    # Validate the API key against the database
+    from app.models.database import ApiKey
     
-    # In production, try to validate the API key
-    # This is a placeholder - you'd need to implement actual validation
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid API key"
-    )
+    # Find API key in database
+    db_api_key = db.query(ApiKey).filter(
+        ApiKey.api_key == api_key,
+        ApiKey.is_active == True
+    ).first()
+    
+    if not db_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key"
+        )
+    
+    # Get the associated user
+    user = db.query(User).filter(
+        User.id == db_api_key.user_id,
+        User.is_active == True
+    ).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="API key user not found or inactive"
+        )
+    
+    return user
