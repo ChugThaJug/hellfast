@@ -1,6 +1,4 @@
 # app/api/routes/subscription.py
-# Add/update routes for Paddle
-
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from typing import Dict, List, Optional
@@ -9,7 +7,7 @@ import logging
 
 from app.db.database import get_db
 from app.models.database import User, Subscription
-from app.services.auth import get_current_active_user
+from app.dependencies.auth import get_current_active_user
 from app.services.subscription import SubscriptionService
 from app.services.paddle import PaddleService
 from app.core.settings import settings
@@ -102,7 +100,6 @@ async def get_subscription_status(
         "max_video_length": plan_data.get("max_video_length")
     }
 
-# In app/api/routes/subscription.py
 @router.post("/create", response_model=Dict)
 async def create_subscription(
     subscription_data: SubscriptionCreate,
@@ -143,22 +140,10 @@ async def create_subscription(
     )
     
     if not checkout_url:
-        # In development mode, activate subscription directly
-        if settings.APP_ENV == "development":
-            subscription = await SubscriptionService.create_subscription(
-                db, current_user.id, subscription_data.plan_id
-            )
-            return {
-                "plan_id": subscription.plan_id,
-                "status": subscription.status,
-                "current_period_end": subscription.current_period_end.isoformat(),
-                "message": f"{settings.SUBSCRIPTION_PLANS[subscription_data.plan_id]['name']} subscription activated successfully (development mode)"
-            }
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to create checkout session"
-            )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create checkout session"
+        )
     
     # Return checkout URL for redirection
     return {
@@ -178,9 +163,8 @@ async def paddle_webhook(request: Request, db: Session = Depends(get_db)):
         # Get the Paddle-Signature header
         signature = request.headers.get("Paddle-Signature", "")
         
-        # Verify signature in production mode
-        valid_signature = True  # Default to true for development
-        if settings.APP_ENV != "development" and signature and settings.PADDLE_WEBHOOK_SECRET:
+        # Verify signature
+        if signature and settings.PADDLE_WEBHOOK_SECRET:
             valid_signature = PaddleService.verify_webhook_signature(
                 raw_body,  # Use raw body bytes
                 signature, 
@@ -194,34 +178,16 @@ async def paddle_webhook(request: Request, db: Session = Depends(get_db)):
         event_type = data.get("event_type", "")
         logger.info(f"Received Paddle webhook: {event_type}")
         
-        # In development, always process webhooks regardless of signature
-        if settings.APP_ENV == "development" or valid_signature:
-            # Process different webhook events
-            if "subscription.created" in event_type:
-                await PaddleService.handle_subscription_created(db, data)
+        # Process different webhook events
+        if "subscription.created" in event_type or "subscription.updated" in event_type:
+            await PaddleService.handle_subscription_created(db, data)
+        
+        elif "subscription.cancelled" in event_type or "subscription.canceled" in event_type:
+            await PaddleService.handle_subscription_cancelled(db, data)
             
-            elif "subscription.cancelled" in event_type or "subscription.canceled" in event_type:
-                await PaddleService.handle_subscription_cancelled(db, data)
-            
-            elif "subscription.updated" in event_type:
-                await PaddleService.handle_subscription_updated(db, data)
-                
-            # Handle transaction completion to reset quota
-            elif "transaction.completed" in event_type:
-                # Extract subscription info from transaction
-                transaction_data = data.get("data", {})
-                subscription_id = transaction_data.get("subscription_id")
-                
-                if subscription_id:
-                    # Find subscription
-                    subscription = db.query(Subscription).filter(
-                        Subscription.paddle_subscription_id == subscription_id
-                    ).first()
-                    
-                    if subscription:
-                        # Reset quota for new billing period
-                        subscription.used_quota = 0
-                        db.commit()
+        # Handle transaction completion to reset quota
+        elif "transaction.completed" in event_type:
+            await PaddleService.handle_subscription_updated(db, data)
         
         return {"status": "ok"}
     except Exception as e:

@@ -1,23 +1,14 @@
 <!-- frontend/src/routes/subscription/+page.svelte -->
-<script>
+<script lang="ts">
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { subscriptionApi } from "$lib/api";
   import { Check } from "lucide-svelte";
   import type { SubscriptionPlan, SubscriptionStatus } from "$lib/api/schema";
   import ProtectedRoute from "$lib/components/auth/ProtectedRoute.svelte";
-  import { 
-    initPaddle, 
-    loadPrices, 
-    priceMap, 
-    loadingPrices, 
-    selectedBillingFrequency,
-    selectedCountry,
-    billingFrequency,
-    openCheckout
-  } from "../../stores/paddle";
-  import { PricingTiers, BillingFrequency } from "../../constants/pricing";
-  import { auth } from "$lib/stores/auth";
+  import PaddleLoader from "$lib/components/subscription/PaddleLoader.svelte";
+  import { paddleService } from "$lib/services/paddle";
+  import { browser } from "$app/environment";
   
   let plans: SubscriptionPlan[] = [];
   let currentStatus: SubscriptionStatus | null = null;
@@ -26,12 +17,9 @@
   let error: string | null = null;
   let yearlyBilling = false;
   
-  // Get all price IDs for price preview
-  let allPriceIds = [];
-  PricingTiers.forEach(tier => {
-    allPriceIds.push(tier.priceId.month);
-    allPriceIds.push(tier.priceId.year);
-  });
+  // Get Paddle vendor ID from environment
+  const paddleVendorId = browser ? import.meta.env.VITE_PADDLE_VENDOR_ID || '11111' : '11111';
+  const paddleSandbox = browser ? import.meta.env.VITE_PADDLE_SANDBOX === 'true' : true;
   
   // Function to format price with currency
   function formatPrice(price: number): string {
@@ -51,10 +39,6 @@
   
   onMount(async () => {
     try {
-      // Initialize Paddle and load prices
-      await initPaddle();
-      await loadPrices(allPriceIds, $selectedCountry);
-      
       // Get plans and status from API
       const [plansData, statusData] = await Promise.all([
         subscriptionApi.getPlans(),
@@ -66,21 +50,15 @@
       
       console.log('Plans loaded:', plans);
       console.log('Current status:', currentStatus);
+      
+      // Initialize Paddle service
+      await paddleService.initialize();
     } catch (err) {
       console.error('Error loading subscription data:', err);
       error = err instanceof Error ? err.message : "Failed to load subscription data";
     } finally {
       loading = false;
     }
-    
-    // Listen for country changes
-    const unsubscribe = selectedCountry.subscribe(async (country) => {
-      await loadPrices(allPriceIds, country);
-    });
-    
-    return () => {
-      unsubscribe();
-    };
   });
   
   async function selectPlan(planId: string) {
@@ -110,10 +88,33 @@
         yearly: yearlyBilling
       });
       
-      // If checkout URL is provided, redirect to it
+      // If checkout URL is provided, open Paddle checkout
       if (result.checkout_url) {
-        console.log('Redirecting to checkout:', result.checkout_url);
-        window.location.href = result.checkout_url;
+        console.log('Opening Paddle checkout:', result.checkout_url);
+        
+        // Try to open Paddle checkout
+        const checkoutOpened = await paddleService.openCheckout(
+          result.checkout_url,
+          {
+            successCallback: () => {
+              // Redirect to success page
+              goto(`/subscription/success?plan_id=${planId}`);
+            },
+            closeCallback: () => {
+              processing = false;
+            },
+            errorCallback: (err) => {
+              console.error('Paddle checkout error:', err);
+              error = "An error occurred with the payment process. Please try again.";
+              processing = false;
+            }
+          }
+        );
+        
+        // If checkout couldn't be opened, redirect to the URL
+        if (!checkoutOpened) {
+          window.location.href = result.checkout_url;
+        }
       } 
       // If message is provided, subscription was created directly
       else if (result.message) {
@@ -125,7 +126,6 @@
     } catch (err) {
       console.error('Error creating subscription:', err);
       error = err instanceof Error ? err.message : "Failed to process subscription";
-    } finally {
       processing = false;
     }
   }
@@ -145,15 +145,22 @@
       window.location.reload();
     } catch (err) {
       error = err instanceof Error ? err.message : "Failed to cancel subscription";
-    } finally {
       processing = false;
     }
+  }
+  
+  // Toggle yearly/monthly billing
+  function toggleBilling() {
+    yearlyBilling = !yearlyBilling;
   }
 </script>
 
 <svelte:head>
   <title>Choose Your Plan - Stepify</title>
 </svelte:head>
+
+<!-- Load Paddle JavaScript -->
+<PaddleLoader vendorId={paddleVendorId} sandbox={paddleSandbox} />
 
 <ProtectedRoute>
   <div class="container mx-auto px-4 py-12">
@@ -165,18 +172,21 @@
     <!-- Billing toggle -->
     <div class="flex justify-center mb-8">
       <div class="flex items-center p-1 bg-muted rounded-full">
-        {#each BillingFrequency as frequency}
-          <button 
-            class={`px-4 py-2 rounded-full transition ${$selectedBillingFrequency === frequency.value ? 'bg-background shadow-sm' : ''}`}
-            on:click={() => selectedBillingFrequency.set(frequency.value)}
-            disabled={processing}
-          >
-            {frequency.label}
-            {#if frequency.value === 'year'}
-              <span class="text-sm text-green-500">Save 16%</span>
-            {/if}
-          </button>
-        {/each}
+        <button 
+          class={`px-4 py-2 rounded-full transition ${!yearlyBilling ? 'bg-background shadow-sm' : ''}`}
+          on:click={() => yearlyBilling = false}
+          disabled={processing}
+        >
+          Monthly
+        </button>
+        <button 
+          class={`px-4 py-2 rounded-full transition ${yearlyBilling ? 'bg-background shadow-sm' : ''}`}
+          on:click={() => yearlyBilling = true}
+          disabled={processing}
+        >
+          Yearly
+          <span class="text-sm text-green-500">Save 16%</span>
+        </button>
       </div>
     </div>
     
@@ -304,23 +314,5 @@
         </div>
       </div>
     {/if}
-    
-    <!-- Country selector for localized pricing -->
-    <div class="mt-16 text-center">
-      <div class="inline-flex items-center bg-muted/30 px-4 py-2 rounded-md">
-        <span class="mr-2">Preview localized prices:</span>
-        <select 
-          bind:value={$selectedCountry}
-          class="bg-background/20 border border-border/30 rounded px-2 py-1 text-sm"
-        >
-          <option value="US">United States</option>
-          <option value="GB">United Kingdom</option>
-          <option value="DE">Germany</option>
-          <option value="FR">France</option>
-          <option value="CA">Canada</option>
-          <option value="AU">Australia</option>
-        </select>
-      </div>
-    </div>
   </div>
 </ProtectedRoute>

@@ -70,8 +70,7 @@ export const authApi = {
     })
 };
 
-// frontend/src/lib/api/index.ts
-// Make sure this section is updated or added
+// frontend/src/lib/api/index.ts - Update the subscription related API calls
 
 // Subscription API
 export const subscriptionApi = {

@@ -58,43 +58,57 @@ class Settings(BaseSettings):
     PADDLE_WEBHOOK_SECRET: Optional[str] = os.getenv("PADDLE_WEBHOOK_SECRET", "")
     PADDLE_SANDBOX: bool = os.getenv("PADDLE_SANDBOX", "true").lower() == "true"
 
-    # Paddle Plan IDs
-    PADDLE_PRO_PLAN_ID: Optional[str] = os.getenv("PADDLE_PRO_PLAN_ID", "")
-    PADDLE_PRO_YEARLY_PLAN_ID: Optional[str] = os.getenv("PADDLE_PRO_YEARLY_PLAN_ID", "")
-    PADDLE_MAX_PLAN_ID: Optional[str] = os.getenv("PADDLE_MAX_PLAN_ID", "")
-    PADDLE_MAX_YEARLY_PLAN_ID: Optional[str] = os.getenv("PADDLE_MAX_YEARLY_PLAN_ID", "")
+    # Add these lines to the Settings class in app/core/settings.py
 
-        # Update subscription plans after defining the variables above
-    SUBSCRIPTION_PLANS: Dict[str, Dict] = {
-        "free": {
-            "name": "Free",
-            "price": 0,
-            "monthly_quota": 3,
-            "features": ["simple_mode", "bullet_points", "summary"],
-            "max_video_length": 10,  # in minutes
-            "paddle_plan_id": None  # Free plans don't need Paddle IDs
-        },
-        "pro": {
-            "name": "Pro",
-            "price": 4.99,
-            "yearly_price": 49.99,
-            "monthly_quota": 15,
-            "features": ["simple_mode", "detailed_mode", "bullet_points", "summary", "step_by_step"],
-            "max_video_length": 30,  # in minutes
-            "paddle_plan_id": PADDLE_PRO_PLAN_ID,
-            "paddle_yearly_plan_id": PADDLE_PRO_YEARLY_PLAN_ID
-        },
-        "max": {
-            "name": "Max",
-            "price": 9.99,
-            "yearly_price": 99.99,
-            "monthly_quota": 50,
-            "features": ["simple_mode", "detailed_mode", "bullet_points", "summary", "step_by_step", "podcast_article", "api_access"],
-            "max_video_length": 120,  # in minutes (2 hours)
-            "paddle_plan_id": PADDLE_MAX_PLAN_ID,
-            "paddle_yearly_plan_id": PADDLE_MAX_YEARLY_PLAN_ID
-        }
-    }
+    # Paddle Basic Plan IDs
+    PADDLE_BASIC_PLAN_ID: Optional[str] = os.getenv("PADDLE_BASIC_PLAN_ID", "")
+    PADDLE_BASIC_YEARLY_PLAN_ID: Optional[str] = os.getenv("PADDLE_BASIC_YEARLY_PLAN_ID", "")
+
+    # Paddle Premium Plan IDs
+    PADDLE_PREMIUM_PLAN_ID: Optional[str] = os.getenv("PADDLE_PREMIUM_PLAN_ID", "")
+    PADDLE_PREMIUM_YEARLY_PLAN_ID: Optional[str] = os.getenv("PADDLE_PREMIUM_YEARLY_PLAN_ID", "")
+
+    # Paddle Enterprise Plan IDs
+    PADDLE_ENTERPRISE_PLAN_ID: Optional[str] = os.getenv("PADDLE_ENTERPRISE_PLAN_ID", "")
+    PADDLE_ENTERPRISE_YEARLY_PLAN_ID: Optional[str] = os.getenv("PADDLE_ENTERPRISE_YEARLY_PLAN_ID", "")
+
+    # # Paddle Plan IDs
+    # PADDLE_PRO_PLAN_ID: Optional[str] = os.getenv("PADDLE_PRO_PLAN_ID", "")
+    # PADDLE_PRO_YEARLY_PLAN_ID: Optional[str] = os.getenv("PADDLE_PRO_YEARLY_PLAN_ID", "")
+    # PADDLE_MAX_PLAN_ID: Optional[str] = os.getenv("PADDLE_MAX_PLAN_ID", "")
+    # PADDLE_MAX_YEARLY_PLAN_ID: Optional[str] = os.getenv("PADDLE_MAX_YEARLY_PLAN_ID", "")
+
+    #     # Update subscription plans after defining the variables above
+    # SUBSCRIPTION_PLANS: Dict[str, Dict] = {
+    #     "free": {
+    #         "name": "Free",
+    #         "price": 0,
+    #         "monthly_quota": 3,
+    #         "features": ["simple_mode", "bullet_points", "summary"],
+    #         "max_video_length": 10,  # in minutes
+    #         "paddle_plan_id": None  # Free plans don't need Paddle IDs
+    #     },
+    #     "pro": {
+    #         "name": "Pro",
+    #         "price": 4.99,
+    #         "yearly_price": 49.99,
+    #         "monthly_quota": 15,
+    #         "features": ["simple_mode", "detailed_mode", "bullet_points", "summary", "step_by_step"],
+    #         "max_video_length": 30,  # in minutes
+    #         "paddle_plan_id": PADDLE_PRO_PLAN_ID,
+    #         "paddle_yearly_plan_id": PADDLE_PRO_YEARLY_PLAN_ID
+    #     },
+    #     "max": {
+    #         "name": "Max",
+    #         "price": 9.99,
+    #         "yearly_price": 99.99,
+    #         "monthly_quota": 50,
+    #         "features": ["simple_mode", "detailed_mode", "bullet_points", "summary", "step_by_step", "podcast_article", "api_access"],
+    #         "max_video_length": 120,  # in minutes (2 hours)
+    #         "paddle_plan_id": PADDLE_MAX_PLAN_ID,
+    #         "paddle_yearly_plan_id": PADDLE_MAX_YEARLY_PLAN_ID
+    #     }
+    # }
     
     # CORS Settings
     CORS_ORIGINS: List[str] = [
@@ -145,31 +159,47 @@ class Settings(BaseSettings):
     # Cache retention (days)
     CACHE_RETENTION_DAYS: int = 7
     
-    # Subscription plans
+# In app/core/settings.py, update the SUBSCRIPTION_PLANS section
+
+    # Update subscription plans with correct Paddle IDs
     SUBSCRIPTION_PLANS: Dict[str, Dict] = {
         "free": {
             "name": "Free",
             "price": 0,
             "monthly_quota": 3,
-            "features": ["simple_mode", "detailed_mode", "bullet_points", "summary", "step_by_step"]
+            "features": ["simple_mode", "bullet_points", "summary"],
+            "max_video_length": 10,  # in minutes
+            "paddle_plan_id": None  # Free plans don't need Paddle IDs
         },
         "basic": {
             "name": "Basic",
             "price": 9.99,
+            "yearly_price": 99.90,
             "monthly_quota": 20,
-            "features": ["simple_mode", "detailed_mode", "bullet_points", "summary", "step_by_step"]
+            "features": ["simple_mode", "detailed_mode", "bullet_points", "summary", "step_by_step"],
+            "max_video_length": 30,  # in minutes
+            "paddle_plan_id": PADDLE_BASIC_PLAN_ID,
+            "paddle_yearly_plan_id": PADDLE_BASIC_YEARLY_PLAN_ID
         },
         "premium": {
             "name": "Premium",
             "price": 19.99,
+            "yearly_price": 199.90,
             "monthly_quota": 50,
-            "features": ["simple_mode", "detailed_mode", "bullet_points", "summary", "step_by_step", "podcast_article"]
+            "features": ["simple_mode", "detailed_mode", "bullet_points", "summary", "step_by_step", "podcast_article"],
+            "max_video_length": 60,  # in minutes
+            "paddle_plan_id": PADDLE_PREMIUM_PLAN_ID,
+            "paddle_yearly_plan_id": PADDLE_PREMIUM_YEARLY_PLAN_ID
         },
         "enterprise": {
             "name": "Enterprise",
             "price": 49.99,
+            "yearly_price": 499.90,
             "monthly_quota": 200,
-            "features": ["simple_mode", "detailed_mode", "bullet_points", "summary", "step_by_step", "podcast_article"]
+            "features": ["simple_mode", "detailed_mode", "bullet_points", "summary", "step_by_step", "podcast_article", "api_access"],
+            "max_video_length": 120,  # in minutes
+            "paddle_plan_id": PADDLE_ENTERPRISE_PLAN_ID,
+            "paddle_yearly_plan_id": PADDLE_ENTERPRISE_YEARLY_PLAN_ID
         }
     }
     

@@ -1,43 +1,94 @@
 # app/services/paddle.py
-import json
-import logging
 import hmac
 import hashlib
+import logging
+import json
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
-import httpx
 
 from app.core.settings import settings
 from app.models.database import Subscription, User
 
 logger = logging.getLogger(__name__)
 
+# Import the paddle_billing_client if available
+try:
+    from paddle_billing_client.client import PaddleApiClient
+    from paddle_billing_client.errors import VerboseErrorHandler
+    from apiclient.authentication_methods import HeaderAuthentication
+    from paddle_billing_client.models.transaction import TransactionRequest
+    from paddle_billing_client.models.subscription import SubscriptionRequest
+    from paddle_billing_client.helpers import validate_webhook_signature
+    HAS_PADDLE_CLIENT = True
+except ImportError:
+    logger.warning("paddle_billing_client not installed. Some features will be limited.")
+    HAS_PADDLE_CLIENT = False
+
 class PaddleService:
     """Service for Paddle payment processing and subscription management."""
     
+    @classmethod
+    def get_client(cls):
+        """Get Paddle API client instance."""
+        if not HAS_PADDLE_CLIENT:
+            logger.error("Paddle client not available")
+            return None
+            
+        if not settings.PADDLE_API_KEY:
+            logger.error("Paddle API key not configured")
+            return None
+            
+        try:
+            # Initialize client with proper authentication
+            base_url = "https://sandbox-api.paddle.com" if settings.PADDLE_SANDBOX else "https://api.paddle.com"
+            client = PaddleApiClient(
+                base_url=base_url,
+                authentication_method=HeaderAuthentication(token=settings.PADDLE_API_KEY),
+                error_handler=VerboseErrorHandler
+            )
+            return client
+        except Exception as e:
+            logger.error(f"Error initializing Paddle client: {str(e)}")
+            return None
+    
     @staticmethod
-    def verify_webhook_signature(raw_body: bytes, signature: str, secret: str) -> bool:
+    def verify_webhook_signature(raw_body: bytes, signature: str, secret: str = None) -> bool:
         """
         Verify Paddle webhook signature using the raw request body and HMAC.
         """
+        if not secret and settings.PADDLE_WEBHOOK_SECRET:
+            secret = settings.PADDLE_WEBHOOK_SECRET
+            
         if not secret:
             logger.warning("No Paddle webhook secret configured for verification")
             return False
         
         try:
-            # Basic HMAC verification
-            computed_hmac = hmac.new(
-                secret.encode('utf-8'),
-                raw_body,
-                hashlib.sha256
+            # Use helper from paddle_billing_client if available
+            if HAS_PADDLE_CLIENT:
+                return validate_webhook_signature(
+                    signature_header=signature,
+                    raw_body=raw_body,
+                    secret_key=secret
+                )
+            
+            # Fallback to manual verification
+            ts_part, h1_part = signature.split(";")
+            var, timestamp = ts_part.split("=")
+            var, signature = h1_part.split("=")
+            
+            signed_payload = ":".join([timestamp, raw_body.decode("utf-8")])
+            
+            # Paddle generates signatures using a keyed-hash message authentication code (HMAC) with SHA256 and a secret key.
+            computed_signature = hmac.new(
+                key=secret.encode("utf-8"),
+                msg=signed_payload.encode("utf-8"),
+                digestmod=hashlib.sha256
             ).hexdigest()
             
-            # Extract received signature from header
-            # Paddle's signature format: ts=1234567890,h=hash
-            received_signature = signature.split(',')[0].split('=')[1]
-            
-            return hmac.compare_digest(computed_hmac, received_signature)
+            # Compare the computed signature with the signature extracted from the Paddle-Signature header.
+            return hmac.compare_digest(computed_signature, signature)
         except Exception as e:
             logger.error(f"Error verifying webhook signature: {str(e)}")
             return False
@@ -57,13 +108,6 @@ class PaddleService:
         if not settings.PADDLE_API_KEY:
             logger.error("Paddle API key not configured")
             return None
-            
-        # In development mode without real API key, return a mock URL
-        if settings.APP_ENV == "development":
-            # For development mode, just return a mock checkout URL
-            mock_url = f"https://checkout.paddle.com/checkout/custom/dev-checkout?user={user_id}&plan={plan_id}&yearly={is_yearly}"
-            logger.info(f"Development mode - using mock checkout URL: {mock_url}")
-            return mock_url
             
         try:
             # Get the appropriate plan data
@@ -88,15 +132,14 @@ class PaddleService:
                 logger.error(f"No Paddle plan ID configured for {plan_id}")
                 return None
             
-            # For development, use mock URL
-            if settings.APP_ENV == "development":
-                return f"https://checkout.paddle.com/checkout/custom/dev-checkout?user={user_id}&plan={plan_id}&yearly={is_yearly}"
+            client = PaddleService.get_client()
+            if not client:
+                logger.error("Failed to initialize Paddle client")
+                return None
+                
+            logger.info(f"Creating checkout for price_id: {paddle_plan_id}, email: {user_email}")
             
-            # For production, make real API call
-            # Determine API base URL based on sandbox setting
-            base_url = "https://sandbox-api.paddle.com" if settings.PADDLE_SANDBOX else "https://api.paddle.com"
-            
-            # Create checkout data
+            # Create checkout with Paddle API
             checkout_data = {
                 "items": [
                     {
@@ -104,7 +147,6 @@ class PaddleService:
                         "quantity": 1
                     }
                 ],
-                "customer_id": f"user_{user_id}",
                 "customer_email": user_email,
                 "custom_data": {
                     "user_id": str(user_id),
@@ -115,29 +157,24 @@ class PaddleService:
             # Add success and cancel URLs if provided
             if success_url:
                 checkout_data["success_url"] = success_url
+                
             if cancel_url:
                 checkout_data["cancel_url"] = cancel_url
             
-            # Make API request to create checkout
-            try:
-                async with httpx.AsyncClient() as client:
-                    response = await client.post(
-                        f"{base_url}/checkout",
-                        json=checkout_data,
-                        headers={
-                            "Authorization": f"Bearer {settings.PADDLE_API_KEY}",
-                            "Content-Type": "application/json"
-                        }
-                    )
-                    
-                    if response.status_code != 200:
-                        logger.error(f"Paddle API error: {response.text}")
-                        return None
-                        
-                    data = response.json()
-                    return data.get("checkout_url")
-            except Exception as e:
-                logger.error(f"Error making Paddle API request: {str(e)}")
+            # Create transaction request
+            transaction_request = TransactionRequest(**checkout_data)
+            
+            # Create checkout
+            response = client.create_transaction(transaction_request)
+            
+            # Get checkout URL
+            checkout_url = response.data.checkout.url if hasattr(response.data, 'checkout') else None
+            
+            if checkout_url:
+                logger.info(f"Created checkout: {checkout_url}")
+                return checkout_url
+            else:
+                logger.error("No checkout URL returned from Paddle API")
                 return None
             
         except Exception as e:
@@ -233,6 +270,7 @@ class PaddleService:
             db.commit()
             db.refresh(subscription)
             
+            logger.info(f"Created/updated subscription for user {user_id} with plan {plan_id}")
             return subscription
             
         except Exception as e:
@@ -265,6 +303,8 @@ class PaddleService:
             # Update status
             subscription.status = "cancelled"
             db.commit()
+            
+            logger.info(f"Subscription {subscription_id} marked as cancelled")
             
             # Create free tier subscription
             from app.services.subscription import SubscriptionService
@@ -316,8 +356,14 @@ class PaddleService:
                     except:
                         # Ignore parse errors
                         pass
-                    
+            
+            # Handle transaction.completed to reset quota
+            if event_data.get("event_type") == "transaction.completed":
+                # Reset quota for new billing period
+                subscription.used_quota = 0
+                
             db.commit()
+            logger.info(f"Updated subscription {subscription_id} with status {status}")
             
         except Exception as e:
             logger.error(f"Error handling subscription updated: {str(e)}")
