@@ -168,90 +168,59 @@ async def create_subscription(
 async def paddle_webhook(request: Request, db: Session = Depends(get_db)):
     """Handle Paddle webhook events."""
     try:
-        # Parse webhook data
-        data = await request.json()
+        # Get the raw request body first - important for signature verification
+        raw_body = await request.body()
         
-        # Get signature from header (if provided)
+        # Parse the data from the raw body for processing
+        data = json.loads(raw_body)
+        
+        # Get the Paddle-Signature header
         signature = request.headers.get("Paddle-Signature", "")
         
-        # Verify signature if in production
-        if settings.APP_ENV != "development" and signature:
-            if not PaddleService.verify_webhook_signature(data, signature):
+        # Verify signature in production mode
+        valid_signature = True  # Default to true for development
+        if settings.APP_ENV != "development" and signature and settings.PADDLE_WEBHOOK_SECRET:
+            valid_signature = PaddleService.verify_webhook_signature(
+                raw_body,  # Use raw body bytes
+                signature, 
+                settings.PADDLE_WEBHOOK_SECRET
+            )
+            if not valid_signature:
                 logger.warning("Invalid Paddle webhook signature")
                 return {"status": "invalid_signature"}
         
-        # Get alert name and data
-        alert_name = data.get("alert_name")
-        logger.info(f"Received Paddle webhook: {alert_name}")
+        # Log the event
+        event_type = data.get("event_type", "")
+        logger.info(f"Received Paddle webhook: {event_type}")
         
-        # Process different webhook events
-        if alert_name == "subscription_created":
-            # Extract data
-            subscription_id = data.get("subscription_id")
-            user_id = None
-            plan_id = None
+        # In development, always process webhooks regardless of signature
+        if settings.APP_ENV == "development" or valid_signature:
+            # Process different webhook events
+            if "subscription.created" in event_type:
+                await PaddleService.handle_subscription_created(db, data)
             
-            # Extract user_id and plan_id from passthrough
-            try:
-                passthrough = json.loads(data.get("passthrough", "{}"))
-                user_id = passthrough.get("user_id")
-                plan_id = passthrough.get("plan_id")
-            except:
-                logger.error("Failed to parse passthrough data")
+            elif "subscription.cancelled" in event_type or "subscription.canceled" in event_type:
+                await PaddleService.handle_subscription_cancelled(db, data)
             
-            if user_id and plan_id and subscription_id:
-                # Get status and next bill date
-                status = data.get("status", "active")
-                next_bill_date = data.get("next_bill_date", "")
+            elif "subscription.updated" in event_type:
+                await PaddleService.handle_subscription_updated(db, data)
                 
-                # Create or update subscription
-                await PaddleService.handle_subscription_created(
-                    db, 
-                    int(user_id), 
-                    subscription_id, 
-                    plan_id, 
-                    status, 
-                    next_bill_date
-                )
-        
-        # Handle cancellation
-        elif alert_name == "subscription_cancelled":
-            subscription_id = data.get("subscription_id")
-            if subscription_id:
-                await PaddleService.handle_subscription_cancelled(db, subscription_id)
-        
-        # Handle updates
-        elif alert_name == "subscription_updated":
-            subscription_id = data.get("subscription_id")
-            if subscription_id:
-                status = data.get("status", "active")
-                next_bill_date = data.get("next_bill_date", "")
+            # Handle transaction completion to reset quota
+            elif "transaction.completed" in event_type:
+                # Extract subscription info from transaction
+                transaction_data = data.get("data", {})
+                subscription_id = transaction_data.get("subscription_id")
                 
-                # Plan ID from passthrough if available
-                plan_id = None
-                try:
-                    passthrough = json.loads(data.get("passthrough", "{}"))
-                    plan_id = passthrough.get("plan_id")
-                except:
-                    pass
-                
-                await PaddleService.handle_subscription_updated(
-                    db, subscription_id, status, plan_id, next_bill_date
-                )
-        
-        # Payment succeeded event - update quota if it's a renewal
-        elif alert_name == "payment_succeeded":
-            subscription_id = data.get("subscription_id")
-            if subscription_id:
-                # Find subscription
-                subscription = db.query(Subscription).filter(
-                    Subscription.paddle_subscription_id == subscription_id
-                ).first()
-                
-                if subscription:
-                    # Reset quota for new billing period
-                    subscription.used_quota = 0
-                    db.commit()
+                if subscription_id:
+                    # Find subscription
+                    subscription = db.query(Subscription).filter(
+                        Subscription.paddle_subscription_id == subscription_id
+                    ).first()
+                    
+                    if subscription:
+                        # Reset quota for new billing period
+                        subscription.used_quota = 0
+                        db.commit()
         
         return {"status": "ok"}
     except Exception as e:

@@ -50,13 +50,21 @@ class Settings(BaseSettings):
     OAUTH_REDIRECT_URL: str = os.getenv("OAUTH_REDIRECT_URL", "http://localhost:8000/oauth/google/callback")
     # Add to app/core/settings.py within the Settings class
 
+# In app/core/settings.py within the Settings class
+# Add these fields to the class definition:
+
     # Paddle settings
-    PADDLE_VENDOR_ID: str = os.getenv("PADDLE_VENDOR_ID", "")
-    PADDLE_API_KEY: str = os.getenv("PADDLE_API_KEY", "")
-    PADDLE_PUBLIC_KEY: str = os.getenv("PADDLE_PUBLIC_KEY", "")
+    PADDLE_API_KEY: Optional[str] = os.getenv("PADDLE_API_KEY", "")
+    PADDLE_WEBHOOK_SECRET: Optional[str] = os.getenv("PADDLE_WEBHOOK_SECRET", "")
     PADDLE_SANDBOX: bool = os.getenv("PADDLE_SANDBOX", "true").lower() == "true"
 
-    # Update subscription plans
+    # Paddle Plan IDs
+    PADDLE_PRO_PLAN_ID: Optional[str] = os.getenv("PADDLE_PRO_PLAN_ID", "")
+    PADDLE_PRO_YEARLY_PLAN_ID: Optional[str] = os.getenv("PADDLE_PRO_YEARLY_PLAN_ID", "")
+    PADDLE_MAX_PLAN_ID: Optional[str] = os.getenv("PADDLE_MAX_PLAN_ID", "")
+    PADDLE_MAX_YEARLY_PLAN_ID: Optional[str] = os.getenv("PADDLE_MAX_YEARLY_PLAN_ID", "")
+
+        # Update subscription plans after defining the variables above
     SUBSCRIPTION_PLANS: Dict[str, Dict] = {
         "free": {
             "name": "Free",
@@ -73,8 +81,8 @@ class Settings(BaseSettings):
             "monthly_quota": 15,
             "features": ["simple_mode", "detailed_mode", "bullet_points", "summary", "step_by_step"],
             "max_video_length": 30,  # in minutes
-            "paddle_plan_id": os.getenv("PADDLE_PRO_PLAN_ID", ""),
-            "paddle_yearly_plan_id": os.getenv("PADDLE_PRO_YEARLY_PLAN_ID", "")
+            "paddle_plan_id": PADDLE_PRO_PLAN_ID,
+            "paddle_yearly_plan_id": PADDLE_PRO_YEARLY_PLAN_ID
         },
         "max": {
             "name": "Max",
@@ -83,8 +91,8 @@ class Settings(BaseSettings):
             "monthly_quota": 50,
             "features": ["simple_mode", "detailed_mode", "bullet_points", "summary", "step_by_step", "podcast_article", "api_access"],
             "max_video_length": 120,  # in minutes (2 hours)
-            "paddle_plan_id": os.getenv("PADDLE_MAX_PLAN_ID", ""),
-            "paddle_yearly_plan_id": os.getenv("PADDLE_MAX_YEARLY_PLAN_ID", "")
+            "paddle_plan_id": PADDLE_MAX_PLAN_ID,
+            "paddle_yearly_plan_id": PADDLE_MAX_YEARLY_PLAN_ID
         }
     }
     
