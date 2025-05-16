@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
     REPLICATE_API_TOKEN: Optional[str] = os.getenv("REPLICATE_API_TOKEN")
 
+# Add these lines to app/core/settings.py in the Settings class
+# Make sure FRONTEND_URL is defined BEFORE using it
+
     # Frontend URL - Make sure this is defined before OAuth settings
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")  # SvelteKit default dev port
 
@@ -45,57 +48,67 @@ class Settings(BaseSettings):
 
     # Use these for the backend OAuth flow
     OAUTH_REDIRECT_URL: str = os.getenv("OAUTH_REDIRECT_URL", "http://localhost:8000/oauth/google/callback")
+    # Add to app/core/settings.py within the Settings class
+
+# In app/core/settings.py within the Settings class
+# Add these fields to the class definition:
 
     # Paddle settings
     PADDLE_API_KEY: Optional[str] = os.getenv("PADDLE_API_KEY", "")
     PADDLE_WEBHOOK_SECRET: Optional[str] = os.getenv("PADDLE_WEBHOOK_SECRET", "")
     PADDLE_SANDBOX: bool = os.getenv("PADDLE_SANDBOX", "true").lower() == "true"
 
-    # Paddle Plan IDs for Free/Pro/Max structure
-    PADDLE_PRO_PLAN_ID: Optional[str] = os.getenv("PADDLE_PRO_PLAN_ID", "")
-    PADDLE_PRO_YEARLY_PLAN_ID: Optional[str] = os.getenv("PADDLE_PRO_YEARLY_PLAN_ID", "")
-    PADDLE_MAX_PLAN_ID: Optional[str] = os.getenv("PADDLE_MAX_PLAN_ID", "")
-    PADDLE_MAX_YEARLY_PLAN_ID: Optional[str] = os.getenv("PADDLE_MAX_YEARLY_PLAN_ID", "")
+    # Add these lines to the Settings class in app/core/settings.py
 
-    # Helper function for development mode plan IDs
-    def get_plan_id_with_fallback(self, env_var: str, plan_type: str) -> str:
-        """Get plan ID with development fallback."""
-        plan_id = getattr(self, env_var, "")
-        if not plan_id and self.APP_ENV == "development":
-            return f"dev_{plan_type}_id"
-        return plan_id
+    # Paddle Basic Plan IDs
+    PADDLE_BASIC_PLAN_ID: Optional[str] = os.getenv("PADDLE_BASIC_PLAN_ID", "")
+    PADDLE_BASIC_YEARLY_PLAN_ID: Optional[str] = os.getenv("PADDLE_BASIC_YEARLY_PLAN_ID", "")
 
-    # Update subscription plans with correct Paddle IDs
-    SUBSCRIPTION_PLANS: Dict[str, Dict] = {
-        "free": {
-            "name": "Free",
-            "price": 0,
-            "monthly_quota": 3,
-            "features": ["simple_mode", "bullet_points", "summary"],
-            "max_video_length": 10,  # in minutes
-            "paddle_plan_id": None  # Free plans don't need Paddle IDs
-        },
-        "pro": {
-            "name": "Pro",
-            "price": 4.99,
-            "yearly_price": 49.99,
-            "monthly_quota": 15,
-            "features": ["simple_mode", "detailed_mode", "bullet_points", "summary", "step_by_step"],
-            "max_video_length": 30,  # in minutes
-            "paddle_plan_id": PADDLE_PRO_PLAN_ID,
-            "paddle_yearly_plan_id": PADDLE_PRO_YEARLY_PLAN_ID
-        },
-        "max": {
-            "name": "Max",
-            "price": 9.99,
-            "yearly_price": 99.99,
-            "monthly_quota": 50,
-            "features": ["simple_mode", "detailed_mode", "bullet_points", "summary", "step_by_step", "podcast_article", "api_access"],
-            "max_video_length": 120,  # in minutes (2 hours)
-            "paddle_plan_id": PADDLE_MAX_PLAN_ID,
-            "paddle_yearly_plan_id": PADDLE_MAX_YEARLY_PLAN_ID
-        }
-    }
+    # Paddle Premium Plan IDs
+    PADDLE_PREMIUM_PLAN_ID: Optional[str] = os.getenv("PADDLE_PREMIUM_PLAN_ID", "")
+    PADDLE_PREMIUM_YEARLY_PLAN_ID: Optional[str] = os.getenv("PADDLE_PREMIUM_YEARLY_PLAN_ID", "")
+
+    # Paddle Enterprise Plan IDs
+    PADDLE_ENTERPRISE_PLAN_ID: Optional[str] = os.getenv("PADDLE_ENTERPRISE_PLAN_ID", "")
+    PADDLE_ENTERPRISE_YEARLY_PLAN_ID: Optional[str] = os.getenv("PADDLE_ENTERPRISE_YEARLY_PLAN_ID", "")
+
+    # # Paddle Plan IDs
+    # PADDLE_PRO_PLAN_ID: Optional[str] = os.getenv("PADDLE_PRO_PLAN_ID", "")
+    # PADDLE_PRO_YEARLY_PLAN_ID: Optional[str] = os.getenv("PADDLE_PRO_YEARLY_PLAN_ID", "")
+    # PADDLE_MAX_PLAN_ID: Optional[str] = os.getenv("PADDLE_MAX_PLAN_ID", "")
+    # PADDLE_MAX_YEARLY_PLAN_ID: Optional[str] = os.getenv("PADDLE_MAX_YEARLY_PLAN_ID", "")
+
+    #     # Update subscription plans after defining the variables above
+    # SUBSCRIPTION_PLANS: Dict[str, Dict] = {
+    #     "free": {
+    #         "name": "Free",
+    #         "price": 0,
+    #         "monthly_quota": 3,
+    #         "features": ["simple_mode", "bullet_points", "summary"],
+    #         "max_video_length": 10,  # in minutes
+    #         "paddle_plan_id": None  # Free plans don't need Paddle IDs
+    #     },
+    #     "pro": {
+    #         "name": "Pro",
+    #         "price": 4.99,
+    #         "yearly_price": 49.99,
+    #         "monthly_quota": 15,
+    #         "features": ["simple_mode", "detailed_mode", "bullet_points", "summary", "step_by_step"],
+    #         "max_video_length": 30,  # in minutes
+    #         "paddle_plan_id": PADDLE_PRO_PLAN_ID,
+    #         "paddle_yearly_plan_id": PADDLE_PRO_YEARLY_PLAN_ID
+    #     },
+    #     "max": {
+    #         "name": "Max",
+    #         "price": 9.99,
+    #         "yearly_price": 99.99,
+    #         "monthly_quota": 50,
+    #         "features": ["simple_mode", "detailed_mode", "bullet_points", "summary", "step_by_step", "podcast_article", "api_access"],
+    #         "max_video_length": 120,  # in minutes (2 hours)
+    #         "paddle_plan_id": PADDLE_MAX_PLAN_ID,
+    #         "paddle_yearly_plan_id": PADDLE_MAX_YEARLY_PLAN_ID
+    #     }
+    # }
     
     # CORS Settings
     CORS_ORIGINS: List[str] = [
@@ -105,6 +118,8 @@ class Settings(BaseSettings):
     ]
     CORS_METHODS: List[str] = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     CORS_HEADERS: List[str] = ["*"]
+    
+    # Rest of your settings class remains the same...
     
     # Directory settings
     CACHE_DIR: str = "cache"
@@ -144,7 +159,52 @@ class Settings(BaseSettings):
     # Cache retention (days)
     CACHE_RETENTION_DAYS: int = 7
     
-    # System prompts
+# In app/core/settings.py, update the SUBSCRIPTION_PLANS section
+
+    # Update subscription plans with correct Paddle IDs
+    SUBSCRIPTION_PLANS: Dict[str, Dict] = {
+        "free": {
+            "name": "Free",
+            "price": 0,
+            "monthly_quota": 3,
+            "features": ["simple_mode", "bullet_points", "summary"],
+            "max_video_length": 10,  # in minutes
+            "paddle_plan_id": None  # Free plans don't need Paddle IDs
+        },
+        "basic": {
+            "name": "Basic",
+            "price": 9.99,
+            "yearly_price": 99.90,
+            "monthly_quota": 20,
+            "features": ["simple_mode", "detailed_mode", "bullet_points", "summary", "step_by_step"],
+            "max_video_length": 30,  # in minutes
+            "paddle_plan_id": PADDLE_BASIC_PLAN_ID,
+            "paddle_yearly_plan_id": PADDLE_BASIC_YEARLY_PLAN_ID
+        },
+        "premium": {
+            "name": "Premium",
+            "price": 19.99,
+            "yearly_price": 199.90,
+            "monthly_quota": 50,
+            "features": ["simple_mode", "detailed_mode", "bullet_points", "summary", "step_by_step", "podcast_article"],
+            "max_video_length": 60,  # in minutes
+            "paddle_plan_id": PADDLE_PREMIUM_PLAN_ID,
+            "paddle_yearly_plan_id": PADDLE_PREMIUM_YEARLY_PLAN_ID
+        },
+        "enterprise": {
+            "name": "Enterprise",
+            "price": 49.99,
+            "yearly_price": 499.90,
+            "monthly_quota": 200,
+            "features": ["simple_mode", "detailed_mode", "bullet_points", "summary", "step_by_step", "podcast_article", "api_access"],
+            "max_video_length": 120,  # in minutes
+            "paddle_plan_id": PADDLE_ENTERPRISE_PLAN_ID,
+            "paddle_yearly_plan_id": PADDLE_ENTERPRISE_YEARLY_PLAN_ID
+        }
+    }
+    
+    # In app/core/settings.py, update the SYSTEM_PROMPTS section
+
     SYSTEM_PROMPTS: Dict[str, str] = {
         "bullet_points": """Transform this transcript into concise bullet points.
         Focus on key information, main ideas, and important details.

@@ -1,6 +1,7 @@
 // frontend/src/lib/api/index.ts
 import type { JobStatus, ProcessedVideo, SubscriptionPlan, SubscriptionStatus, User, VideoEntry } from "./schema";
 import { fetchWithAuth } from "./client";
+import { isDevelopmentMode, getMockSubscriptionPlans, getMockSubscriptionStatus } from '$lib/utils/development';
 
 // Helper function to extract video ID from YouTube URL
 function extractVideoId(url: string): string {
@@ -70,24 +71,55 @@ export const authApi = {
     })
 };
 
-// frontend/src/lib/api/index.ts - Update the subscription related API calls
-
 // Subscription API
 export const subscriptionApi = {
   // Get subscription plans
-  getPlans: (): Promise<SubscriptionPlan[]> =>
-    fetchWithAuth('/subscription/plans'),
+  getPlans: async (): Promise<SubscriptionPlan[]> => {
+    try {
+      return await fetchWithAuth('/subscription/plans');
+    } catch (error) {
+      // Use development fallback if in development mode
+      if (isDevelopmentMode()) {
+        console.warn('Using mock subscription plans in development mode');
+        return getMockSubscriptionPlans();
+      }
+      throw error;
+    }
+  },
   
   // Get subscription status
-  getStatus: (): Promise<SubscriptionStatus> =>
-    fetchWithAuth('/subscription/status'),
+  getStatus: async (): Promise<SubscriptionStatus> => {
+    try {
+      return await fetchWithAuth('/subscription/status');
+    } catch (error) {
+      // Use development fallback if in development mode
+      if (isDevelopmentMode()) {
+        console.warn('Using mock subscription status in development mode');
+        return getMockSubscriptionStatus();
+      }
+      throw error;
+    }
+  },
   
   // Create subscription
-  createSubscription: (data: {plan_id: string, yearly: boolean}): Promise<{checkout_url?: string, message?: string}> =>
-    fetchWithAuth('/subscription/create', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    }),
+  createSubscription: async (data: {plan_id: string, yearly: boolean}): Promise<{checkout_url?: string, message?: string}> => {
+    try {
+      return await fetchWithAuth('/subscription/create', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    } catch (error) {
+      // In development mode, create a mock checkout URL
+      if (isDevelopmentMode()) {
+        console.warn('Using mock subscription checkout in development mode');
+        const frontendUrl = window.location.origin;
+        return { 
+          checkout_url: `${frontendUrl}/subscription/dev-checkout?plan_id=${data.plan_id}&billing=${data.yearly ? 'yearly' : 'monthly'}` 
+        };
+      }
+      throw error;
+    }
+  },
     
   // Cancel subscription
   cancelSubscription: (): Promise<{message: string}> =>

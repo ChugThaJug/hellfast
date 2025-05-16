@@ -94,13 +94,6 @@ class PaddleService:
             return False
     
     @staticmethod
-    def create_dev_checkout_url(user_id: int, plan_id: str, is_yearly: bool = False) -> str:
-        """Create mock checkout URL for development environment."""
-        frontend_url = settings.FRONTEND_URL or "http://localhost:5173"
-        billing = "yearly" if is_yearly else "monthly"
-        return f"{frontend_url}/subscription/dev-checkout?user_id={user_id}&plan_id={plan_id}&billing={billing}"
-    
-    @staticmethod
     async def create_checkout(
         plan_id: str,
         user_id: int,
@@ -112,16 +105,8 @@ class PaddleService:
         """
         Create a Paddle checkout session.
         """
-        # For development mode, create a mock checkout URL
-        if settings.APP_ENV == "development":
-            logger.info(f"Creating mock checkout in development mode for plan: {plan_id}")
-            return PaddleService.create_dev_checkout_url(user_id, plan_id, is_yearly)
-            
         if not settings.PADDLE_API_KEY:
             logger.error("Paddle API key not configured")
-            # Return mock URL in development mode
-            if settings.APP_ENV == "development":
-                return PaddleService.create_dev_checkout_url(user_id, plan_id, is_yearly)
             return None
             
         try:
@@ -145,9 +130,6 @@ class PaddleService:
             
             if not paddle_plan_id:
                 logger.error(f"No Paddle plan ID configured for {plan_id}")
-                # Return mock URL in development mode
-                if settings.APP_ENV == "development":
-                    return PaddleService.create_dev_checkout_url(user_id, plan_id, is_yearly)
                 return None
             
             client = PaddleService.get_client()
@@ -197,9 +179,6 @@ class PaddleService:
             
         except Exception as e:
             logger.error(f"Error creating Paddle checkout: {str(e)}")
-            # Return mock URL in development mode
-            if settings.APP_ENV == "development":
-                return PaddleService.create_dev_checkout_url(user_id, plan_id, is_yearly)
             return None
     
     @staticmethod

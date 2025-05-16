@@ -23,6 +23,7 @@
   
   // Format the date
   function formatDate(dateStr: string): string {
+    if (dateStr === "-") return "N/A";
     return new Date(dateStr).toLocaleDateString();
   }
   
@@ -30,6 +31,16 @@
   function calculateUsagePercentage(): number {
     if (!status) return 0;
     return (status.used_quota / status.monthly_quota) * 100;
+  }
+  
+  // Format plan name for display
+  function getPlanDisplayName(planId: string): string {
+    switch (planId) {
+      case 'pro': return 'Pro';
+      case 'max': return 'Max';
+      case 'free': return 'Free';
+      default: return planId.charAt(0).toUpperCase() + planId.slice(1);
+    }
   }
 </script>
 
@@ -43,7 +54,7 @@
   {#if minimal}
     <div class="flex items-center gap-2">
       <span class="bg-primary/20 text-primary px-2 py-0.5 rounded-full text-xs">
-        {status.plan_id.charAt(0).toUpperCase() + status.plan_id.slice(1)}
+        {getPlanDisplayName(status.plan_id)}
       </span>
       <span class="text-sm text-foreground/60">
         {status.used_quota}/{status.monthly_quota} videos
@@ -59,7 +70,7 @@
       <div class="space-y-3">
         <div>
           <p class="text-sm text-foreground/60 mb-1">Plan</p>
-          <p class="font-medium">{status.plan_id.charAt(0).toUpperCase() + status.plan_id.slice(1)}</p>
+          <p class="font-medium">{getPlanDisplayName(status.plan_id)}</p>
         </div>
         
         <div>

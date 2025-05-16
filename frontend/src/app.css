@@ -142,25 +142,27 @@
 }
 
 @layer components {
-	*:not(body) {
-		outline: none !important;
-		&:focus-visible {
-			@apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-background;
-		}
-	}
+  /* Fix the nested focus-visible issue */
+  *:not(body) {
+    outline: none !important;
+  }
+  
+  *:not(body):focus-visible {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
 
-	.link {
-		@apply inline-flex items-center gap-1 rounded-sm font-medium underline underline-offset-4 hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-background;
-	}
+  .link {
+    @apply inline-flex items-center gap-1 rounded-sm font-medium underline underline-offset-4 hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
 
-	input::-webkit-outer-spin-button,
-	input::-webkit-inner-spin-button {
-		-webkit-appearance: none;
-		margin: 0;
-	}
+  input::-webkit-outer-spin-button,
+  input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
 
-	/* Firefox */
-	input[type="number"] {
-		-moz-appearance: textfield;
-	}
+  /* Firefox */
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
 }
