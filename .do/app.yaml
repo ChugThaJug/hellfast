@@ -4,13 +4,22 @@ services:
   github:
     repo: your-github-username/hellfast
     branch: main
-  build_command: |
-    # Frontend build
-    cd frontend && npm ci && npm run build && cd ..
-    # Backend build
-    pip install -r requirements.txt
-  run_command: python main.py
+  # Force Python 3.10 which has better compatibility with packages
   environment_slug: python
+  build_command: |
+    echo "Using Python version:"
+    python --version
+    python -m pip install --upgrade pip
+    
+    # Install PyYAML with binary option first to prevent build issues
+    pip install --no-binary :all: PyYAML==6.0
+    
+    # Then install remaining requirements
+    pip install -r requirements.txt
+    
+    # Frontend build
+    cd frontend && npm ci && npm run build
+  run_command: python main.py
   envs:
   - key: APP_ENV
     value: production
@@ -23,6 +32,9 @@ services:
     scope: RUN_TIME
   - key: PORT
     value: "8000"
+    scope: RUN_AND_BUILD_TIME
+  - key: PYTHON_VERSION
+    value: "3.10"
     scope: RUN_AND_BUILD_TIME
   routes:
   - path: /
