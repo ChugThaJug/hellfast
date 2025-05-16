@@ -1,12 +1,13 @@
 # app/dependencies/auth.py
-from fastapi import Depends, HTTPException, status, Request, Header
+
+from fastapi import Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
 import logging
 from typing import Optional
 import jwt
 
 from app.db.database import get_db
-from app.models.database import User
+from app.models.database import User, ApiKey
 from app.core.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,7 @@ async def get_current_user(
         # Extract token from header
         scheme, token = authorization.split()
         if scheme.lower() != "bearer":
+            logger.warning(f"Invalid authentication scheme: {scheme}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid authentication scheme",
@@ -47,7 +49,10 @@ async def get_current_user(
             email = payload.get("sub")
             user_id = payload.get("user_id")
             
+            logger.info(f"Token payload: email={email}, user_id={user_id}")
+            
             if not email and not user_id:
+                logger.warning("Token missing both email and user_id")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Invalid token content",
@@ -61,6 +66,7 @@ async def get_current_user(
                 user = db.query(User).filter(User.email == email).first()
                 
             if not user:
+                logger.warning(f"User not found: email={email}, user_id={user_id}")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="User not found",
@@ -69,7 +75,8 @@ async def get_current_user(
                 
             return user
                 
-        except jwt.PyJWTError:
+        except jwt.PyJWTError as e:
+            logger.error(f"JWT verification error: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Could not validate credentials",
@@ -77,6 +84,7 @@ async def get_current_user(
             )
         
     except ValueError:
+        logger.error("Invalid token format - couldn't split authorization header")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token format",
@@ -106,9 +114,6 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
 # For API key authentication
 async def validate_api_key(api_key: str, db: Session) -> User:
     """Validate API key and return user."""
-    # Validate the API key against the database
-    from app.models.database import ApiKey
-    
     # Find API key in database
     db_api_key = db.query(ApiKey).filter(
         ApiKey.api_key == api_key,

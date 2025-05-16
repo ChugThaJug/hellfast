@@ -9,6 +9,7 @@ const API_BASE_URL = browser
 // Options type for fetchWithAuth
 interface FetchOptions extends RequestInit {
   skipAuth?: boolean;
+  timeout?: number;
 }
 
 /**
@@ -20,6 +21,7 @@ export async function fetchWithAuth(endpoint: string, options: FetchOptions = {}
     let token = null;
     if (browser && !options.skipAuth) {
       token = localStorage.getItem('token');
+      console.log(`API Request to ${endpoint} - Auth token present: ${!!token}`);
     }
     
     // Ensure endpoint starts with '/'
@@ -32,19 +34,32 @@ export async function fetchWithAuth(endpoint: string, options: FetchOptions = {}
       ...options.headers
     };
     
+    // Set up a timeout if specified
+    const timeout = options.timeout || 20000; // 20 seconds default timeout
+    
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    
     // Execute request
     console.log(`API Request: ${API_BASE_URL}${normalizedEndpoint}`);
     const response = await fetch(`${API_BASE_URL}${normalizedEndpoint}`, {
       ...options,
-      headers
+      headers,
+      signal: controller.signal
     });
+    
+    // Clear timeout
+    clearTimeout(timeoutId);
     
     // Handle common response scenarios
     if (response.status === 401 && browser) {
+      console.error('Authentication error: Token invalid or expired');
       // Unauthorized - clear token and redirect to login
       localStorage.removeItem('token');
-      window.location.href = '/auth/login?session=expired';
-      throw new Error('Session expired. Please log in again.');
+      
+      // Throw specific error for 401
+      throw new Error('Authentication required. Please log in.');
     }
     
     // Handle error responses
@@ -62,6 +77,12 @@ export async function fetchWithAuth(endpoint: string, options: FetchOptions = {}
     // Return response data
     return await response.json();
   } catch (error) {
+    // Handle timeout errors
+    if (error.name === 'AbortError') {
+      console.error('API request timeout');
+      throw new Error('Request timed out. Please try again later.');
+    }
+    
     console.error('API request failed:', error);
     throw error;
   }

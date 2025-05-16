@@ -22,14 +22,15 @@
       
       console.log("Access token received, logging in...");
       
-      // Store token in localStorage
-      localStorage.setItem('token', accessToken);
+      // Store token in localStorage and login
+      await auth.loginWithToken(accessToken);
       
-      // Initialize auth with the new token
-      await auth.initialize();
+      // Get redirect path or default to dashboard
+      const redirectPath = localStorage.getItem('auth_redirect') || '/dashboard';
+      localStorage.removeItem('auth_redirect');
       
-      // Redirect to dashboard
-      goto("/dashboard");
+      // Redirect to saved path or dashboard
+      goto(redirectPath);
     } catch (err) {
       console.error("OAuth success error:", err);
       error = err instanceof Error ? err.message : "Failed to process OAuth login";

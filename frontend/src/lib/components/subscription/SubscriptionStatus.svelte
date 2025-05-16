@@ -15,7 +15,14 @@
     try {
       status = await subscriptionApi.getStatus();
     } catch (err) {
+      console.error("Failed to load subscription status:", err);
       error = err instanceof Error ? err.message : "Failed to load subscription status";
+      
+      // If the error is 401 Unauthorized, we don't need to show an error
+      // The ProtectedRoute component will handle the redirect
+      if (err instanceof Error && err.message.includes("401")) {
+        error = "Authentication required";
+      }
     } finally {
       loading = false;
     }
@@ -49,7 +56,15 @@
     <div class="h-4 w-24 bg-muted animate-pulse rounded"></div>
   </div>
 {:else if error}
-  <div class="text-destructive text-sm">{error}</div>
+  <div class="p-4 border rounded-lg bg-background">
+    <div class="text-destructive text-sm mb-2">{error}</div>
+    <button 
+      class="text-sm text-primary hover:underline" 
+      on:click={() => location.reload()}
+    >
+      Try again
+    </button>
+  </div>
 {:else if status}
   {#if minimal}
     <div class="flex items-center gap-2">
@@ -93,4 +108,8 @@
       </div>
     </div>
   {/if}
+{:else}
+  <div class="p-4 border rounded-lg bg-background">
+    <p class="text-foreground/60">No subscription information available</p>
+  </div>
 {/if}

@@ -1,4 +1,5 @@
 // frontend/src/lib/stores/auth.ts
+
 import { writable } from 'svelte/store';
 import type { User } from '$lib/api/schema';
 import { browser } from '$app/environment';
@@ -23,12 +24,28 @@ function createAuthStore() {
   return {
     subscribe,
     
-    // Login with email/password not supported anymore - redirects to OAuth
+    // Login with OAuth flow
     login: async () => {
-      // Redirect to OAuth page
-      if (browser) {
-        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-        window.location.href = `${apiBaseUrl}/oauth/google/login`;
+      update(state => ({ ...state, loading: true, error: null }));
+      try {
+        // Store current path for redirection after login
+        if (browser) {
+          localStorage.setItem('auth_redirect', window.location.pathname);
+        }
+        
+        // Redirect to Google OAuth
+        if (browser) {
+          const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+          console.log("Redirecting to OAuth:", `${apiBaseUrl}/oauth/google/login`);
+          window.location.href = `${apiBaseUrl}/oauth/google/login`;
+        }
+      } catch (error) {
+        console.error("OAuth redirect error:", error);
+        update(state => ({ 
+          ...state, 
+          loading: false, 
+          error: error instanceof Error ? error.message : "Login failed" 
+        }));
       }
     },
     
@@ -36,10 +53,17 @@ function createAuthStore() {
     loginWithToken: async (token: string) => {
       update(state => ({ ...state, loading: true, error: null }));
       try {
+        console.log("Logging in with token...");
+        
+        // Verify token with backend
         const user = await authApi.verifyToken(token);
+        
         if (browser) {
+          // Store token in localStorage
           localStorage.setItem('token', token);
+          console.log("Token stored successfully");
         }
+        
         set({ 
           user, 
           authenticated: true, 
@@ -48,33 +72,7 @@ function createAuthStore() {
         });
         return user;
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Login failed';
-        set({ 
-          user: null, 
-          authenticated: false, 
-          loading: false,
-          error: errorMessage 
-        });
-        throw error;
-      }
-    },
-    
-    // Development login - always succeeds
-    loginDevelopment: async () => {
-      update(state => ({ ...state, loading: true, error: null }));
-      try {
-        const user = await authApi.devLogin();
-        if (browser) {
-          localStorage.setItem('token', 'dev-token'); // Dev token
-        }
-        set({ 
-          user, 
-          authenticated: true, 
-          loading: false,
-          error: null 
-        });
-        return user;
-      } catch (error) {
+        console.error("Token login error:", error);
         const errorMessage = error instanceof Error ? error.message : 'Login failed';
         set({ 
           user: null, 
@@ -120,6 +118,7 @@ function createAuthStore() {
       update(state => ({ ...state, loading: true }));
       
       const token = localStorage.getItem('token');
+      console.log("Auth initialization - Token exists:", !!token);
       
       if (!token) {
         set({ 
@@ -133,7 +132,10 @@ function createAuthStore() {
       
       try {
         // Try to get user profile from backend
+        console.log("Fetching user profile...");
         const user = await authApi.getProfile();
+        console.log("User profile fetched:", user);
+        
         set({ 
           user, 
           authenticated: true, 
@@ -158,5 +160,6 @@ export const auth = createAuthStore();
 
 // Initialize auth on import (for browser environments)
 if (browser) {
+  console.log("Initializing auth store on import");
   auth.initialize();
 }

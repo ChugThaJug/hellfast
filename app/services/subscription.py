@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta
+# app/services/subscription.py
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 import logging
@@ -9,19 +10,11 @@ from app.models.database import User, Subscription, Video, OutputFormat, Process
 
 logger = logging.getLogger(__name__)
 
-# Try to import Stripe if available
-try:
-    import stripe
-    stripe.api_key = settings.STRIPE_API_KEY
-    HAS_STRIPE = True
-except (ImportError, AttributeError):
-    HAS_STRIPE = False
-    logger.warning("Stripe not configured. Payment features will be limited.")
-
-
 class SubscriptionService:
+    """Service for managing user subscriptions and usage quotas."""
+    
     @staticmethod
-    def get_subscription(db: Session, user_id: int) -> Subscription:
+    def get_subscription(db: Session, user_id: int) -> Optional[Subscription]:
         """Get user's subscription."""
         return db.query(Subscription).filter(Subscription.user_id == user_id).first()
     
@@ -29,7 +22,7 @@ class SubscriptionService:
     def create_free_subscription(db: Session, user_id: int) -> Subscription:
         """Create a free subscription for a new user."""
         # Set period to one month from now
-        current_time = datetime.utcnow()
+        current_time = datetime.now(timezone.utc)
         period_end = current_time + timedelta(days=30)
         
         subscription = Subscription(
@@ -48,9 +41,6 @@ class SubscriptionService:
         
         logger.info(f"Created free subscription for user {user_id}")
         return subscription
-    
-# In app/services/subscription.py
-# Method for creating a new subscription
 
     @staticmethod
     async def create_subscription(db: Session, user_id: int, plan_id: str, stripe_customer_id: Optional[str] = None) -> Subscription:
@@ -62,7 +52,7 @@ class SubscriptionService:
         existing = db.query(Subscription).filter(Subscription.user_id == user_id).first()
         
         # Set period to one month from now
-        current_time = datetime.utcnow()
+        current_time = datetime.now(timezone.utc)
         period_end = current_time + timedelta(days=30)
         
         if existing:
@@ -72,7 +62,7 @@ class SubscriptionService:
             existing.current_period_start = current_time
             existing.current_period_end = period_end
             existing.monthly_quota = settings.SUBSCRIPTION_PLANS[plan_id]["monthly_quota"]
-            existing.updated_at = current_time
+            existing.updated_at = current_time if hasattr(existing, 'updated_at') else None
             
             if stripe_customer_id:
                 existing.stripe_customer_id = stripe_customer_id
@@ -165,7 +155,7 @@ class SubscriptionService:
     @staticmethod
     async def reset_monthly_quota(db: Session) -> None:
         """Reset monthly quota for subscriptions at period end."""
-        current_time = datetime.utcnow()
+        current_time = datetime.now(timezone.utc)
         
         # Get subscriptions that need resetting
         expired_subscriptions = db.query(Subscription).filter(
