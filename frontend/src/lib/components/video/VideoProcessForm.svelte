@@ -1,5 +1,4 @@
-<!-- frontend/src/lib/components/video/VideoProcessForm.svelte -->
-<script lang="ts">
+<script>
   import { Search } from "lucide-svelte";
   import { videoApi } from "$lib/api";
   import { goto } from "$app/navigation";
@@ -13,7 +12,7 @@
   let error = "";
   
   // YouTube URL validation
-  function isValidYoutubeUrl(url: string): boolean {
+  function isValidYoutubeUrl(url) {
     const regExp = /^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})$/;
     return regExp.test(url);
   }

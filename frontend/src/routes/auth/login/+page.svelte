@@ -1,4 +1,4 @@
-<!-- src/routes/auth/login/+page.svelte -->
+// frontend/src/routes/auth/login/+page.svelte
 <script lang="ts">
   import { onMount } from "svelte";
   import { page } from "$app/stores";
@@ -7,19 +7,28 @@
   import ProtectedRoute from "$lib/components/auth/ProtectedRoute.svelte";
   
   let loading = false;
+  let apiBaseUrl = '';
   
-  // Check for error in URL params
-  $: if ($page.url.searchParams.get("error")) {
-    auth.setError("Authentication failed. Please try again.");
-  }
+  onMount(() => {
+    // Get API URL from environment variable or use default
+    apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+    console.log("API Base URL:", apiBaseUrl);
+    
+    // Check for error in URL params
+    if ($page.url.searchParams.get("error")) {
+      auth.setError("Authentication failed. Please try again.");
+    }
+  });
   
-  async function handleGoogleLogin() {
+  function handleGoogleLogin() {
     try {
+      console.log("Google login button clicked");
       loading = true;
       
-      // Direct OAuth flow
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-      window.location.href = `${apiBaseUrl}/oauth/google/login`;
+      // Direct OAuth flow - ensure we use window.location.href for proper page navigation
+      const loginUrl = `${apiBaseUrl}/oauth/google/login`;
+      console.log("Redirecting to:", loginUrl);
+      window.location.href = loginUrl;
     } catch (error) {
       console.error("Login error:", error);
       auth.setError("Login failed: " + (error instanceof Error ? error.message : "Unknown error"));
@@ -51,6 +60,7 @@
         class="w-full px-4 py-2 border border-border rounded-md hover:bg-muted flex items-center justify-center"
         on:click={handleGoogleLogin}
         disabled={loading}
+        type="button"
       >
         {#if loading}
           <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>

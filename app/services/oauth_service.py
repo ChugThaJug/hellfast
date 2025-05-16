@@ -29,6 +29,11 @@ class OAuthService:
         # Generate state parameter for CSRF protection
         state = secrets.token_urlsafe(32)
         
+        # Check if credentials are configured
+        if not settings.GOOGLE_CLIENT_ID:
+            logger.error("GOOGLE_CLIENT_ID is not configured")
+            raise ValueError("Google Client ID is not configured")
+            
         params = {
             "client_id": settings.GOOGLE_CLIENT_ID,
             "redirect_uri": redirect_uri,
@@ -62,6 +67,7 @@ class OAuthService:
                 raise ValueError("OAUTH_REDIRECT_URL must be configured")
         
         if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+            logger.error("Google OAuth credentials not configured")
             raise ValueError("Google OAuth credentials must be configured")
             
         data = {
@@ -72,6 +78,8 @@ class OAuthService:
             "redirect_uri": redirect_uri
         }
         
+        logger.info(f"Exchanging code for token with redirect_uri: {redirect_uri}")
+        
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(token_url, data=data)
@@ -80,7 +88,9 @@ class OAuthService:
                     logger.error(f"Error exchanging code for token: {response.text}")
                     return {}
                 
-                return response.json()
+                result = response.json()
+                logger.info("Successfully exchanged code for token")
+                return result
         except Exception as e:
             logger.error(f"Error exchanging code for token: {str(e)}")
             return {}
@@ -101,7 +111,9 @@ class OAuthService:
                     logger.error(f"Error getting user info: {response.text}")
                     return {}
                 
-                return response.json()
+                user_info = response.json()
+                logger.info(f"Retrieved user info for: {user_info.get('email', 'unknown')}")
+                return user_info
         except Exception as e:
             logger.error(f"Error getting user info: {str(e)}")
             return {}
@@ -119,6 +131,7 @@ class OAuthService:
         to_encode.update({"exp": expire})
         
         if not settings.SECRET_KEY:
+            logger.error("SECRET_KEY is not configured")
             raise ValueError("SECRET_KEY must be configured")
             
         encoded_jwt = jwt.encode(
@@ -141,6 +154,7 @@ class OAuthService:
         picture = user_info.get("picture")
         
         if not google_id or not email:
+            logger.error("Google ID or email missing from user info")
             raise ValueError("Google ID and email are required")
         
         # Try to find user by google_id or email
@@ -154,6 +168,7 @@ class OAuthService:
         
         if user:
             # Update existing user
+            logger.info(f"Updating existing user: {email}")
             user.google_id = google_id
             
             # Update optional fields if they exist on the model
@@ -169,6 +184,7 @@ class OAuthService:
             return user
         
         # Create new user
+        logger.info(f"Creating new user for: {email}")
         username = email.split('@')[0]
         
         # Make username unique if needed

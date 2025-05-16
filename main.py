@@ -1,4 +1,4 @@
-# main.py
+# app/main.py
 from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -13,7 +13,7 @@ from app.db.database import create_tables, get_db
 from app.models.database import User
 from app.dependencies.auth import get_current_active_user
 
-# Configure environment - Use environment variable instead of hard-coding
+# Configure environment - Use environment variable
 app_env = os.getenv("APP_ENV", "development")
 settings.APP_ENV = app_env
 
@@ -82,7 +82,6 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "An unexpected error occurred. Please try again later."}
     )
 
-# In main.py, update the imports section
 # Import routers - do this AFTER app is created
 from app.api.routes import youtube, subscription, oauth
 from app.api.routes.auth_api import router as auth_router
@@ -149,4 +148,4 @@ if __name__ == "__main__":
     import uvicorn
     logger.info("Starting YouTube Processing API...")
     logger.info(f"Running in {settings.APP_ENV} mode")
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

@@ -1,20 +1,11 @@
-// frontend/src/lib/stores/auth.ts
-
+// frontend/src/lib/stores/auth.js
 import { writable } from 'svelte/store';
-import type { User } from '$lib/api/schema';
 import { browser } from '$app/environment';
 import { authApi } from '$lib/api';
 import { goto } from '$app/navigation';
 
-interface AuthState {
-  user: User | null;
-  authenticated: boolean;
-  loading: boolean;
-  error: string | null;
-}
-
 function createAuthStore() {
-  const { subscribe, set, update } = writable<AuthState>({
+  const { subscribe, set, update } = writable({
     user: null,
     authenticated: false,
     loading: true,
@@ -50,7 +41,7 @@ function createAuthStore() {
     },
     
     // Login with token directly (for OAuth callback)
-    loginWithToken: async (token: string) => {
+    loginWithToken: async (token) => {
       update(state => ({ ...state, loading: true, error: null }));
       try {
         console.log("Logging in with token...");
@@ -102,7 +93,7 @@ function createAuthStore() {
     },
     
     // Set error
-    setError: (error: string) => {
+    setError: (error) => {
       update(state => ({ ...state, error }));
     },
     

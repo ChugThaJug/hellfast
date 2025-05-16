@@ -1,5 +1,5 @@
-<!-- src/routes/auth/oauth-success/+page.svelte -->
-<script lang="ts">
+<!-- frontend/src/routes/auth/oauth-success/+page.svelte -->
+<script>
   import { page } from "$app/stores";
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
@@ -10,11 +10,14 @@
   
   onMount(async () => {
     try {
+      console.log("OAuth success page loaded");
+      
       // Get access token from URL parameters
       const accessToken = $page.url.searchParams.get("access_token");
       const tokenType = $page.url.searchParams.get("token_type");
       
       if (!accessToken) {
+        console.error("No access token found in URL");
         error = "No access token found in URL";
         loading = false;
         return;
@@ -28,6 +31,8 @@
       // Get redirect path or default to dashboard
       const redirectPath = localStorage.getItem('auth_redirect') || '/dashboard';
       localStorage.removeItem('auth_redirect');
+      
+      console.log(`Redirecting to: ${redirectPath}`);
       
       // Redirect to saved path or dashboard
       goto(redirectPath);
