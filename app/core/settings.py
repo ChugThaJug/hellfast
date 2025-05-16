@@ -34,8 +34,14 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
     REPLICATE_API_TOKEN: Optional[str] = os.getenv("REPLICATE_API_TOKEN")
 
-    # Frontend URL - Make sure this is defined before OAuth settings
-    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")  # SvelteKit default dev port
+    # Add support for Vercel deployment
+    VERCEL_URL = os.getenv("VERCEL_URL", "")
+
+    # Update FRONTEND_URL logic to support Vercel
+    if VERCEL_URL:
+        FRONTEND_URL = f"https://{VERCEL_URL}"
+    else:
+        FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")  # SvelteKit default dev port
 
     # OAuth settings
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
