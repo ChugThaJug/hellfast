@@ -125,12 +125,76 @@ FRONTEND_URL=https://yourdomain.com
 3. Check if Paddle redirects properly
 4. Verify transaction completion
 
-## Troubleshooting
+## Troubleshooting App Platform Build Failures
 
-- **DNS not working**: DNS changes can take up to 48 hours to propagate. Use tools like `dig` or `nslookup` to check DNS resolution.
-- **SSL certificate issues**: Make sure Certbot completed successfully and check Nginx logs.
-- **Paddle still returning localhost URLs**: Verify your Paddle account settings and ensure the domain is properly registered in your Paddle dashboard.
-- **Application errors**: Check application logs with `pm2 logs` or App Platform logs.
+If you encounter a "Build Error: Non-Zero Exit" or other build failures in DigitalOcean App Platform:
+
+### 1. Check Your Build Command
+
+Make sure your build command is correct:
+
+- For a Node.js frontend: `npm run build` or `yarn build`
+- For Python backend: `pip install -r requirements.txt`
+
+Add a `Dockerfile` or `.do/app.yaml` file to your repository for more control over the build process.
+
+### 2. Review Environment Variables
+
+Ensure all required environment variables are properly set in the App Platform console:
+
+1. Go to your app dashboard
+2. Click on the "Settings" tab
+3. Select "Environment Variables"
+4. Add any missing variables that might be needed during the build process
+
+### 3. Check Dependency Issues
+
+1. Review your `package.json` or `requirements.txt` for incompatible dependencies
+2. Make sure you're not using dependencies that aren't compatible with the Node.js or Python version you've selected
+3. Check for any private dependencies that might require authentication
+
+### 4. Add a Build Log Environment Variable
+
+Add `BUILD_VERBOSE=true` to your environment variables to get more detailed build logs.
+
+### 5. Examine the Specific Error Message
+
+Common build errors and solutions:
+
+- **Node.js memory issues**: Increase the build instance size
+- **Missing dependencies**: Add them to your package.json or requirements.txt
+- **Syntax errors**: Fix the identified code issues
+- **Python version compatibility**: Use a .python-version file to specify your Python version
+- **Node version compatibility**: Use a .nvmrc file or specify "engines" in package.json
+
+### 6. Try a Manual Deployment
+
+For quick testing, you can deploy your application manually to a Droplet:
+
+1. SSH into your Droplet
+2. Clone your repository
+3. Install dependencies manually
+4. Build the application manually
+5. Use PM2 or a similar tool to run the application
+
+This approach gives you more visibility into the build process and can help identify specific issues.
+
+### 7. Sample Development .env Configuration
+
+Here's a sample development `.env` file that works with Paddle sandbox and DigitalOcean App Platform:
+
+```
+# Development Environment
+APP_ENV=development
+
+# Domain Configuration
+FRONTEND_URL=https://your-app-name.ondigitalocean.app
+
+# Paddle Settings
+PADDLE_SANDBOX=true
+PADDLE_CHECKOUT_SUCCESS_URL=https://your-app-name.ondigitalocean.app/subscription/success
+PADDLE_CHECKOUT_CANCEL_URL=https://your-app-name.ondigitalocean.app/subscription/cancel
+```
 
 ## Using Paddle's Test Environment
 

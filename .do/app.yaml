@@ -1,0 +1,30 @@
+name: hellfast-app
+services:
+- name: web
+  github:
+    repo: your-github-username/hellfast
+    branch: main
+  build_command: |
+    # Frontend build
+    cd frontend && npm ci && npm run build && cd ..
+    # Backend build
+    pip install -r requirements.txt
+  run_command: python main.py
+  environment_slug: python
+  envs:
+  - key: APP_ENV
+    value: production
+    scope: RUN_AND_BUILD_TIME
+  - key: FRONTEND_URL
+    value: ${APP_URL}
+    scope: RUN_AND_BUILD_TIME
+  - key: PADDLE_SANDBOX
+    value: "false"
+    scope: RUN_TIME
+  - key: PORT
+    value: "8000"
+    scope: RUN_AND_BUILD_TIME
+  routes:
+  - path: /
+    preserve_path_prefix: true
+  http_port: 8000
