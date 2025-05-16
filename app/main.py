@@ -1,5 +1,5 @@
-# main.py
-from fastapi import FastAPI, Request, Depends
+# app/main.py
+from fastapi import FastAPI, Request, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import logging
@@ -83,7 +83,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 # Import routers - do this AFTER app is created
-from app.api.routes import youtube, subscription, oauth
+from app.api.routes import youtube, subscription, oauth, webhook
 from app.api.routes.auth_api import router as auth_router
 
 # Include routers
@@ -91,6 +91,7 @@ app.include_router(youtube.router)
 app.include_router(subscription.router)
 app.include_router(oauth.router)
 app.include_router(auth_router)
+app.include_router(webhook.router)  # Add webhook router
 
 # Root endpoint
 @app.get("/")

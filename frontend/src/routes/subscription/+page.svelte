@@ -5,12 +5,12 @@
   import { page } from "$app/stores";
   import { subscriptionApi } from "$lib/api";
   import { auth } from "$lib/stores/auth";
-  import { paddleService } from "$lib/services/paddle";
+  import { initializePaddle } from "$lib/paddle";
   import ProtectedRoute from "$lib/components/auth/ProtectedRoute.svelte";
   import SubscriptionStatus from "$lib/components/subscription/SubscriptionStatus.svelte";
   import PlanCard from "$lib/components/subscription/PlanCard.svelte";
   import type { SubscriptionPlan, SubscriptionStatus as SubscriptionStatusType } from "$lib/api/schema";
-  
+
   let plans: SubscriptionPlan[] = [];
   let currentStatus: SubscriptionStatusType | null = null;
   let loading = true;
@@ -18,25 +18,28 @@
   let processing = false;
   let plansLoaded = false;
   let authInitialized = false;
-  
+  let paddleInitialized = false;
+  const isDevelopment = import.meta.env.DEV || window.location.hostname === 'localhost';
+  let devCheckoutUrl: string | null = null;
+
   // Function to load plans separately from the initial mount
   async function loadPlans() {
     if (plansLoaded || !$auth.authenticated) return;
-    
+
     try {
       console.log("Loading subscription plans...");
       plans = await subscriptionApi.getPlans();
-      
+
       // Sort plans by price (free first, then increasing)
       plans.sort((a, b) => {
         if (a.id === 'free') return -1;
         if (b.id === 'free') return 1;
         return a.price - b.price;
       });
-      
+
       console.log(`Loaded ${plans.length} subscription plans`);
       plansLoaded = true;
-      
+
       // Then try to load status (if authenticated)
       if ($auth.authenticated) {
         try {
@@ -55,19 +58,26 @@
       loading = false;
     }
   }
-  
+
   // On component mount - initialize Paddle first
-  onMount(async () => {
+  onMount(() => {
     try {
       console.log("Initializing Paddle service...");
-      // Initialize Paddle
-      const paddleInitialized = await paddleService.initialize();
-      if (!paddleInitialized) {
-        console.warn("Paddle initialization failed, checkout will use redirect");
-      } else {
+      // Load Paddle.js script
+      const paddleScript = document.createElement('script');
+      paddleScript.src = 'https://cdn.paddle.com/paddle/v2/paddle.js';
+      paddleScript.async = true;
+      paddleScript.onload = () => {
+        // Initialize Paddle after script loads
+        paddleInitialized = initializePaddle(true); // true for sandbox, false for production
         console.log("Paddle initialized successfully");
-      }
-      
+      };
+      paddleScript.onerror = () => {
+        console.error("Failed to load Paddle.js");
+        error = "Failed to load payment system. Please refresh the page and try again.";
+      };
+      document.head.appendChild(paddleScript);
+
       // Check if we're already authenticated
       if ($auth.authenticated) {
         console.log("User is already authenticated, loading plans...");
@@ -76,28 +86,35 @@
         console.log("User is not authenticated and auth is not loading");
         loading = false;
       }
-      
+
       authInitialized = true;
+
+      // Return cleanup function
+      return () => {
+        if (paddleScript.parentNode) {
+          paddleScript.parentNode.removeChild(paddleScript);
+        }
+      };
     } catch (err) {
       console.error("Error during initialization:", err);
       error = err instanceof Error ? err.message : "Initialization failed";
       loading = false;
     }
   });
-  
+
   // React to auth changes
   $: if (authInitialized && $auth.authenticated && !plansLoaded && !loading) {
     console.log("Auth state changed to authenticated, loading plans...");
     loading = true;
     loadPlans();
   }
-  
+
   // React to auth loading state
   $: if (authInitialized && !$auth.loading && !$auth.authenticated) {
     console.log("Auth loading complete but not authenticated");
     loading = false;
   }
-  
+
   async function handleSubscribe(plan: SubscriptionPlan, isYearly = false) {
     if (!$auth.authenticated) {
       console.log("User not authenticated, redirecting to login");
@@ -106,60 +123,70 @@
       goto("/auth/login");
       return;
     }
-    
+
     try {
       console.log(`Subscribing to ${plan.id} plan (yearly: ${isYearly})`);
       processing = true;
       error = null;
-      
-      const result = await subscriptionApi.createSubscription({
-        plan_id: plan.id,
-        yearly: isYearly
-      });
-      
-      console.log("Subscription creation result:", result);
-      
-      if (result.checkout_url) {
-        // Use Paddle service to handle checkout
-        const useOverlay = await paddleService.openCheckout(result.checkout_url, {
-          successCallback: () => {
-            console.log("Paddle checkout successful");
-            goto(`/subscription/success?plan_id=${plan.id}`);
-          },
-          closeCallback: () => {
-            console.log("Paddle checkout closed");
-            processing = false;
-            // User closed the checkout without completing
-          },
-          errorCallback: (err) => {
-            console.error("Paddle checkout error:", err);
-            error = "There was a problem with the checkout process. Please try again.";
-            processing = false;
+      devCheckoutUrl = null;
+
+      // Directly use the backend API to create a checkout session
+      const response = await subscriptionApi.createSubscription(plan.id, isYearly);
+      console.log("Subscription creation result:", response);
+
+      // Check if we have a checkout URL
+      if (response?.checkout_url) {
+        // Check if the URL is correct (should contain sandbox-buy.paddle.com for sandbox)
+        const url = response.checkout_url;
+
+        if (url.includes('localhost:5000')) {
+          console.warn("Development/test Paddle URL detected:", url);
+          
+          if (isDevelopment) {
+            devCheckoutUrl = url;
+            error = "Development mode: Paddle is returning localhost URLs. This indicates a configuration issue.";
+          } else {
+            error = "The payment system returned an invalid checkout URL. Please contact support.";
+            console.error("Invalid checkout URL received:", url);
+            console.log("Please ensure your Paddle account is properly configured:");
+            console.log("1. Check that your Paddle domains are correctly set up in the Paddle Dashboard");
+            console.log("2. Verify that your API keys and webhook settings are correct");
+            console.log("3. Make sure you're using the correct environment (sandbox vs production)");
           }
-        });
-        
-        // If overlay didn't open, use redirect
-        if (!useOverlay) {
-          console.log("Paddle overlay not available, redirecting to checkout URL");
-          window.location.href = result.checkout_url;
+        } else {
+          console.log("Redirecting to Paddle checkout:", url);
+          window.location.href = url;
         }
-      } else if (result.message) {
-        // Handle free plan or direct activation
-        console.log("Direct activation:", result.message);
-        goto("/subscription/success?plan_id=" + plan.id);
+      } else {
+        throw new Error("No checkout URL was returned from the server");
       }
     } catch (err) {
       console.error("Subscription error:", err);
       error = err instanceof Error ? err.message : "Failed to process subscription";
+    } finally {
       processing = false;
     }
   }
-  
+
+  function openDevCheckout() {
+    if (devCheckoutUrl) {
+      window.open(devCheckoutUrl, '_blank');
+    }
+  }
+
+  function copyDevCheckoutUrl() {
+    if (devCheckoutUrl && navigator.clipboard) {
+      navigator.clipboard.writeText(devCheckoutUrl)
+        .then(() => alert("URL copied to clipboard!"))
+        .catch(err => console.error("Failed to copy URL:", err));
+    }
+  }
+
   function getFeaturedPlanId(): string {
     // Find the pro plan, or second plan if no pro exists
     const proIndex = plans.findIndex(plan => plan.id === 'pro');
     if (proIndex >= 0) return plans[proIndex].id;
-    
+
     // If there's no pro plan but there are at least 2 plans, return the second one
     return plans.length >= 2 ? plans[1].id : (plans[0]?.id || '');
   }
@@ -173,7 +200,7 @@
   <div class="container mx-auto px-4 py-8">
     <h1 class="text-3xl font-bold mb-2">Your Subscription</h1>
     <p class="text-foreground/60 mb-6">Manage your subscription and billing details.</p>
-    
+
     {#if error}
       <div class="bg-destructive/15 text-destructive px-4 py-3 rounded-md mb-4" role="alert">
         <div class="font-medium">Error</div>
@@ -184,9 +211,38 @@
         >
           Try again
         </button>
+        
+        {#if isDevelopment && devCheckoutUrl}
+          <div class="mt-4 p-4 border border-yellow-500 bg-yellow-50 rounded-md">
+            <h3 class="font-bold text-yellow-800">Development Options:</h3>
+            <p class="mb-2 text-yellow-800">You're seeing this because you're in development mode.</p>
+            <ul class="list-disc pl-5 mb-4 text-yellow-800 text-sm">
+              <li>For proper Paddle sandbox integration: Use a custom domain with HTTPS</li>
+              <li>Check Paddle dashboard for domain configuration</li>
+              <li class="mt-2">
+                <span class="font-medium">Your current checkout URL is:</span> 
+                <code class="bg-gray-100 px-1 text-xs break-all block mt-1 p-2">{devCheckoutUrl}</code>
+              </li>
+            </ul>
+            <div class="flex space-x-4">
+              <button 
+                class="px-3 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 font-medium"
+                on:click={openDevCheckout}
+              >
+                Open checkout in new tab
+              </button>
+              <button 
+                class="px-3 py-2 border border-gray-300 rounded hover:bg-gray-100"
+                on:click={copyDevCheckoutUrl}
+              >
+                Copy URL
+              </button>
+            </div>
+          </div>
+        {/if}
       </div>
     {/if}
-    
+
     {#if loading}
       <div class="flex flex-col items-center justify-center py-12">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
@@ -209,12 +265,12 @@
         <h2 class="text-xl font-semibold mb-4">Current Plan</h2>
         <SubscriptionStatus />
       </div>
-      
+
       <!-- Available Plans -->
       {#if plans.length > 0}
         <div>
           <h2 class="text-xl font-semibold mb-6">Available Plans</h2>
-          
+
           <div class="grid md:grid-cols-3 gap-6">
             {#each plans as plan}
               <PlanCard 
@@ -239,7 +295,7 @@
           </button>
         </div>
       {/if}
-      
+
       {#if currentStatus && currentStatus.plan_id !== 'free'}
         <div class="mt-16 border-t pt-8">
           <h2 class="text-xl font-semibold mb-4">Cancel Subscription</h2>
@@ -269,7 +325,7 @@
           </button>
         </div>
       {/if}
-      
+
       <!-- FAQ Section -->
       <div class="mt-16 max-w-3xl border-t pt-8">
         <h2 class="text-xl font-semibold mb-6">Frequently Asked Questions</h2>
@@ -295,3 +351,24 @@
     {/if}
   </div>
 </ProtectedRoute>
+
+<style>
+  /* Special styling for development mode indicators */
+  :global(.dev-mode-indicator) {
+    border: 1px solid #f59e0b;
+    background-color: #fef3c7;
+    padding: 8px;
+    border-radius: 4px;
+    margin-bottom: 12px;
+  }
+
+  /* Make the development checkout options more visible */
+  :global(.checkout-dev-panel) {
+    border: 2px solid #f59e0b;
+    background-color: #fffbeb;
+    padding: 16px;
+    border-radius: 6px;
+    margin: 16px 0;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+</style>

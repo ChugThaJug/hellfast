@@ -97,20 +97,20 @@ export const subscriptionApi = {
   },
   
   // Create subscription
-  createSubscription: async (data: {plan_id: string, yearly: boolean}): Promise<{checkout_url?: string, message?: string}> => {
-    try {
-      console.log(`Creating subscription: ${data.plan_id} (yearly: ${data.yearly})`);
-      const result = await fetchWithAuth('/subscription/create', {
-        method: 'POST',
-        body: JSON.stringify(data),
-        timeout: 30000 // Explicitly set longer timeout
-      });
-      console.log("Subscription creation result:", result);
-      return result;
-    } catch (error) {
-      console.error("Error creating subscription:", error);
-      throw error;
-    }
+  createSubscription: async (planId: string, yearly: boolean = false): Promise<any> => {
+    // Fix the request format to match what the backend expects
+    const payload = {
+      plan_id: planId,              // Must use snake_case to match backend
+      billing_cycle: yearly ? 'yearly' : 'monthly'  // Must provide billing cycle
+    };
+    
+    console.log('Creating subscription with payload:', payload);
+    
+    return fetchWithAuth('/subscription/create', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      timeout: 30000 // Explicitly set longer timeout
+    });
   },
     
   // Cancel subscription

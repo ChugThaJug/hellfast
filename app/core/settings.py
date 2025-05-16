@@ -51,13 +51,17 @@ class Settings(BaseSettings):
     PADDLE_WEBHOOK_SECRET: Optional[str] = os.getenv("PADDLE_WEBHOOK_SECRET", "")
     PADDLE_SANDBOX: bool = os.getenv("PADDLE_SANDBOX", "true").lower() == "true"
 
-    # In app/core/settings.py
-
     # First ensure these variables are defined
     PADDLE_PRO_PLAN_ID: Optional[str] = os.getenv("PADDLE_PRO_PLAN_ID", "")
     PADDLE_PRO_YEARLY_PLAN_ID: Optional[str] = os.getenv("PADDLE_PRO_YEARLY_PLAN_ID", "")
     PADDLE_MAX_PLAN_ID: Optional[str] = os.getenv("PADDLE_MAX_PLAN_ID", "")
     PADDLE_MAX_YEARLY_PLAN_ID: Optional[str] = os.getenv("PADDLE_MAX_YEARLY_PLAN_ID", "")
+
+    # Paddle checkout URLs
+    PADDLE_CHECKOUT_SUCCESS_URL: str = os.getenv("PADDLE_CHECKOUT_SUCCESS_URL", 
+                                                 f"{FRONTEND_URL}/subscription/success")
+    PADDLE_CHECKOUT_CANCEL_URL: str = os.getenv("PADDLE_CHECKOUT_CANCEL_URL", 
+                                                f"{FRONTEND_URL}/subscription/cancel")
 
     # Then update the SUBSCRIPTION_PLANS
 
