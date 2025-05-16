@@ -2,14 +2,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from typing import Dict, List, Optional
-import json
 import logging
 
 from app.db.database import get_db
 from app.models.database import User, Subscription
 from app.dependencies.auth import get_current_active_user
-from app.services.subscription import SubscriptionService
-from app.services.paddle import PaddleService
+from app.services.subscription_service import SubscriptionService
+from app.services.paddle_direct import PaddleDirectService
 from app.core.settings import settings
 
 # Define Pydantic models for request/response
@@ -129,70 +128,33 @@ async def create_subscription(
     success_url = f"{settings.FRONTEND_URL}/subscription/success?plan_id={subscription_data.plan_id}"
     cancel_url = f"{settings.FRONTEND_URL}/subscription/cancel"
     
-    # Create Paddle checkout
-    checkout_url = await PaddleService.create_checkout(
-        plan_id=subscription_data.plan_id,
-        user_id=current_user.id,
-        user_email=current_user.email,
-        is_yearly=subscription_data.yearly,
-        success_url=success_url,
-        cancel_url=cancel_url
-    )
-    
-    if not checkout_url:
+    try:
+        # Create Paddle checkout
+        checkout_url = await PaddleDirectService.create_checkout(
+            plan_id=subscription_data.plan_id,
+            user_id=current_user.id,
+            user_email=current_user.email,
+            is_yearly=subscription_data.yearly,
+            success_url=success_url,
+            cancel_url=cancel_url
+        )
+        
+        if not checkout_url:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create checkout session"
+            )
+        
+        # Return checkout URL for redirection
+        return {
+            "checkout_url": checkout_url
+        }
+    except Exception as e:
+        logger.error(f"Failed to create checkout session: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create checkout session"
+            detail=f"Failed to create checkout session: {str(e)}"
         )
-    
-    # Return checkout URL for redirection
-    return {
-        "checkout_url": checkout_url
-    }
-
-@router.post("/paddle-webhook", include_in_schema=False)
-async def paddle_webhook(request: Request, db: Session = Depends(get_db)):
-    """Handle Paddle webhook events."""
-    try:
-        # Get the raw request body first - important for signature verification
-        raw_body = await request.body()
-        
-        # Parse the data from the raw body for processing
-        data = json.loads(raw_body)
-        
-        # Get the Paddle-Signature header
-        signature = request.headers.get("Paddle-Signature", "")
-        
-        # Verify signature
-        if signature and settings.PADDLE_WEBHOOK_SECRET:
-            valid_signature = PaddleService.verify_webhook_signature(
-                raw_body,  # Use raw body bytes
-                signature, 
-                settings.PADDLE_WEBHOOK_SECRET
-            )
-            if not valid_signature:
-                logger.warning("Invalid Paddle webhook signature")
-                return {"status": "invalid_signature"}
-        
-        # Log the event
-        event_type = data.get("event_type", "")
-        logger.info(f"Received Paddle webhook: {event_type}")
-        
-        # Process different webhook events
-        if "subscription.created" in event_type or "subscription.updated" in event_type:
-            await PaddleService.handle_subscription_created(db, data)
-        
-        elif "subscription.cancelled" in event_type or "subscription.canceled" in event_type:
-            await PaddleService.handle_subscription_cancelled(db, data)
-            
-        # Handle transaction completion to reset quota
-        elif "transaction.completed" in event_type:
-            await PaddleService.handle_subscription_updated(db, data)
-        
-        return {"status": "ok"}
-    except Exception as e:
-        logger.error(f"Error processing webhook: {str(e)}")
-        return {"status": "error", "message": str(e)}
 
 @router.post("/cancel")
 async def cancel_subscription(
@@ -208,17 +170,15 @@ async def cancel_subscription(
             detail="No active subscription found"
         )
     
-    # Update subscription in database
-    subscription.status = "cancelled"
-    db.commit()
+    # Cancel subscription
+    success = await SubscriptionService.cancel_subscription(db, current_user.id)
     
-    # Create free subscription
-    free_subscription = await SubscriptionService.create_subscription(
-        db, 
-        current_user.id, 
-        "free"
-    )
-    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to cancel subscription"
+        )
+        
     return {
         "message": "Subscription cancelled successfully. You have been downgraded to the free plan."
     }

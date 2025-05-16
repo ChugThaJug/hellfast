@@ -68,6 +68,19 @@ app.add_middleware(
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
     start_time = time.time()
+    
+    # Special handling for webhook routes to get raw body
+    path = request.url.path
+    if "/webhooks/" in path:
+        # Store the body before processing
+        body = await request.body()
+        # Create a new request with the same body
+        request = Request(scope=request.scope, receive=request._receive)
+        # Define a custom receive function that returns the stored body
+        async def receive():
+            return {"type": "http.request", "body": body}
+        request._receive = receive
+    
     response = await call_next(request)
     process_time = time.time() - start_time
     response.headers["X-Process-Time"] = str(process_time)
@@ -83,7 +96,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 # Import routers - do this AFTER app is created
-from app.api.routes import youtube, subscription, oauth
+from app.api.routes import youtube, subscription, oauth, webhook
 from app.api.routes.auth_api import router as auth_router
 
 # Include routers
@@ -91,6 +104,7 @@ app.include_router(youtube.router)
 app.include_router(subscription.router)
 app.include_router(oauth.router)
 app.include_router(auth_router)
+app.include_router(webhook.router)  # Add webhook router
 
 # Root endpoint
 @app.get("/")
@@ -117,7 +131,7 @@ async def get_profile(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    from app.services.subscription import SubscriptionService
+    from app.services.subscription_service import SubscriptionService
     
     # Get subscription features
     subscription_features = await SubscriptionService.get_subscription_features(db, current_user.id)

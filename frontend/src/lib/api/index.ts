@@ -1,7 +1,6 @@
 // frontend/src/lib/api/index.ts
 import type { JobStatus, ProcessedVideo, SubscriptionPlan, SubscriptionStatus, User, VideoEntry } from "./schema";
 import { fetchWithAuth } from "./client";
-import { isDevelopmentMode, getMockSubscriptionPlans, getMockSubscriptionStatus } from '$lib/utils/development';
 
 // Helper function to extract video ID from YouTube URL
 function extractVideoId(url: string): string {
@@ -56,13 +55,6 @@ export const authApi = {
   // Get user profile
   getProfile: (): Promise<User> =>
     fetchWithAuth('/auth/profile'),
-  
-  // Development login (no token needed in dev mode)
-  devLogin: (): Promise<User> =>
-    fetchWithAuth('/auth/verify-token', {
-      method: 'POST',
-      body: JSON.stringify({}) // Empty body will work in dev mode
-    }),
     
   // Handle OAuth callback
   handleOAuthCallback: (code: string): Promise<{access_token: string, token_type: string, user: User}> =>
@@ -76,27 +68,30 @@ export const subscriptionApi = {
   // Get subscription plans
   getPlans: async (): Promise<SubscriptionPlan[]> => {
     try {
-      return await fetchWithAuth('/subscription/plans');
+      console.log("Fetching subscription plans...");
+      const plans = await fetchWithAuth('/subscription/plans', {
+        timeout: 30000 // Explicitly set longer timeout for this call
+      });
+      console.log(`Fetched ${plans?.length || 0} subscription plans`);
+      return plans || [];
     } catch (error) {
-      // Use development fallback if in development mode
-      if (isDevelopmentMode()) {
-        console.warn('Using mock subscription plans in development mode');
-        return getMockSubscriptionPlans();
-      }
-      throw error;
+      console.error("Error fetching subscription plans:", error);
+      // Return empty plans array if API fails to prevent UI errors
+      return [];
     }
   },
   
   // Get subscription status
   getStatus: async (): Promise<SubscriptionStatus> => {
     try {
-      return await fetchWithAuth('/subscription/status');
+      console.log("Fetching subscription status...");
+      const status = await fetchWithAuth('/subscription/status', {
+        timeout: 30000 // Explicitly set longer timeout
+      });
+      console.log("Fetched subscription status:", status?.plan_id);
+      return status;
     } catch (error) {
-      // Use development fallback if in development mode
-      if (isDevelopmentMode()) {
-        console.warn('Using mock subscription status in development mode');
-        return getMockSubscriptionStatus();
-      }
+      console.error("Error fetching subscription status:", error);
       throw error;
     }
   },
@@ -104,26 +99,33 @@ export const subscriptionApi = {
   // Create subscription
   createSubscription: async (data: {plan_id: string, yearly: boolean}): Promise<{checkout_url?: string, message?: string}> => {
     try {
-      return await fetchWithAuth('/subscription/create', {
+      console.log(`Creating subscription: ${data.plan_id} (yearly: ${data.yearly})`);
+      const result = await fetchWithAuth('/subscription/create', {
         method: 'POST',
-        body: JSON.stringify(data)
+        body: JSON.stringify(data),
+        timeout: 30000 // Explicitly set longer timeout
       });
+      console.log("Subscription creation result:", result);
+      return result;
     } catch (error) {
-      // In development mode, create a mock checkout URL
-      if (isDevelopmentMode()) {
-        console.warn('Using mock subscription checkout in development mode');
-        const frontendUrl = window.location.origin;
-        return { 
-          checkout_url: `${frontendUrl}/subscription/dev-checkout?plan_id=${data.plan_id}&billing=${data.yearly ? 'yearly' : 'monthly'}` 
-        };
-      }
+      console.error("Error creating subscription:", error);
       throw error;
     }
   },
     
   // Cancel subscription
-  cancelSubscription: (): Promise<{message: string}> =>
-    fetchWithAuth('/subscription/cancel', {
-      method: 'POST'
-    })
+  cancelSubscription: async (): Promise<{message: string}> => {
+    try {
+      console.log("Cancelling subscription...");
+      const result = await fetchWithAuth('/subscription/cancel', {
+        method: 'POST',
+        timeout: 30000 // Explicitly set longer timeout
+      });
+      console.log("Subscription cancellation result:", result);
+      return result;
+    } catch (error) {
+      console.error("Error cancelling subscription:", error);
+      throw error;
+    }
+  }
 };

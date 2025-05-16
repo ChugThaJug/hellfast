@@ -14,68 +14,140 @@ export const paddleService = {
   async initialize(): Promise<boolean> {
     if (!browser) return false;
     
-    // Check if Paddle is already loaded
-    if (window.Paddle) {
-      return true;
-    }
-    
-    // Load Paddle.js dynamically
-    return new Promise((resolve) => {
-      // Listen for paddle-initialized event
-      window.addEventListener('paddle-initialized', () => {
-        resolve(true);
-      }, { once: true });
+    try {
+      // Check if Paddle is already loaded
+      if (window.Paddle) {
+        return true;
+      }
       
-      // Check if Paddle is already loaded every 100ms
-      const checkInterval = setInterval(() => {
-        if (window.Paddle) {
-          clearInterval(checkInterval);
-          resolve(true);
-        }
-      }, 100);
+      // Get environment variables
+      const sandbox = import.meta.env.VITE_PADDLE_SANDBOX === 'true';
+      const vendorId = import.meta.env.VITE_PADDLE_VENDOR_ID;
       
-      // Set a timeout to resolve false if Paddle doesn't load
-      setTimeout(() => {
-        clearInterval(checkInterval);
-        if (!window.Paddle) {
-          console.error('Paddle failed to load within timeout');
+      if (!vendorId) {
+        console.warn('Paddle vendor ID not configured');
+      }
+      
+      // Load Paddle.js script
+      return new Promise((resolve) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.paddle.com/paddle/paddle.js';
+        script.async = true;
+        script.onload = () => {
+          try {
+            if (!window.Paddle) {
+              console.error('Paddle failed to initialize');
+              resolve(false);
+              return;
+            }
+            
+            // Initialize Paddle
+            window.Paddle.Setup({ 
+              vendor: vendorId,
+              environment: sandbox ? 'sandbox' : 'production'
+            });
+            
+            console.log(`Paddle initialized${sandbox ? ' in sandbox mode' : ''}`);
+            
+            // Dispatch event for other components to know Paddle is loaded
+            window.dispatchEvent(new Event('paddle-initialized'));
+            
+            resolve(true);
+          } catch (error) {
+            console.error('Error initializing Paddle:', error);
+            resolve(false);
+          }
+        };
+        
+        script.onerror = () => {
+          console.error('Failed to load Paddle.js');
           resolve(false);
-        }
-      }, 5000);
-    });
+        };
+        
+        document.head.appendChild(script);
+        
+        // Set a timeout to resolve false if Paddle doesn't load
+        setTimeout(() => {
+          if (!window.Paddle) {
+            console.error('Paddle failed to load within timeout');
+            resolve(false);
+          }
+        }, 5000);
+      });
+    } catch (error) {
+      console.error('Error initializing Paddle:', error);
+      return false;
+    }
   },
   
   // Open Paddle checkout with provided URL
   async openCheckout(checkoutUrl: string, options?: CheckoutOptions): Promise<boolean> {
     if (!browser) return false;
     
-    // Make sure Paddle is initialized
-    const initialized = await this.initialize();
-    if (!initialized || !window.Paddle) {
-      console.error('Paddle not initialized');
-      return false;
-    }
-    
     try {
-      // Extract transaction ID from checkout URL
-      const url = new URL(checkoutUrl);
-      const txnParam = url.searchParams.get('txn');
-      
-      if (!txnParam) {
-        console.error('Missing transaction ID in checkout URL');
+      // Make sure Paddle is initialized
+      const initialized = await this.initialize();
+      if (!initialized || !window.Paddle) {
+        console.error('Paddle not initialized, falling back to redirect');
         window.location.href = checkoutUrl; // Fallback to redirect
         return false;
       }
       
-      // Open Paddle checkout
-      window.Paddle.Checkout.open({
-        override: checkoutUrl,
-        successCallback: options?.successCallback,
-        closeCallback: options?.closeCallback,
-        errorCallback: options?.errorCallback
-      });
+      // Parse the URL to extract parameters
+      const url = new URL(checkoutUrl);
       
-      return true;
+      // Extract price ID from the items parameter
+      let priceId = '';
+      try {
+        const path = url.pathname;
+        const parts = path.split('/');
+        if (parts.length >= 3) {
+          priceId = parts[parts.length - 1];
+        }
+      } catch (e) {
+        console.warn('Could not extract price ID from checkout URL:', e);
+      }
+      
+      if (!priceId && url.searchParams.has('priceId')) {
+        priceId = url.searchParams.get('priceId') || '';
+      }
+      
+      // Extract other parameters
+      const planId = url.searchParams.get('plan_id') || '';
+      const successUrl = url.searchParams.get('success_url') || '';
+      const cancelUrl = url.searchParams.get('cancel_url') || '';
+      
+      // Open Paddle checkout
+      if (priceId) {
+        // If we have a price ID, open Paddle checkout directly
+        window.Paddle.Checkout.open({
+          items: [{ priceId, quantity: 1 }],
+          customData: { plan_id: planId },
+          successCallback: options?.successCallback || (() => {
+            if (successUrl) {
+              window.location.href = successUrl;
+            } else {
+              window.location.href = `/subscription/success?plan_id=${planId}`;
+            }
+          }),
+          closeCallback: options?.closeCallback || (() => {
+            if (cancelUrl) {
+              window.location.href = cancelUrl;
+            }
+          }),
+          errorCallback: options?.errorCallback
+        });
+        return true;
+      } else {
+        // Otherwise use the full checkout URL
+        window.Paddle.Checkout.open({
+          override: checkoutUrl,
+          successCallback: options?.successCallback,
+          closeCallback: options?.closeCallback,
+          errorCallback: options?.errorCallback
+        });
+        return true;
+      }
     } catch (error) {
       console.error('Error opening Paddle checkout:', error);
       
@@ -95,8 +167,11 @@ export const paddleService = {
 declare global {
   interface Window {
     Paddle?: {
-      Setup: (options: { vendor: string }) => void;
-      Environment: {
+      Setup: (options: { 
+        vendor: string;
+        environment?: 'sandbox' | 'production';
+      }) => void;
+      Environment?: {
         set: (env: 'sandbox' | 'production') => void;
       };
       Checkout: {

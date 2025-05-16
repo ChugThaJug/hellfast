@@ -12,6 +12,15 @@ interface FetchOptions extends RequestInit {
   timeout?: number;
 }
 
+// Track page navigation to prevent unnecessary errors
+let isNavigating = false;
+if (browser) {
+  // Listen for beforeunload to detect page navigation
+  window.addEventListener('beforeunload', () => {
+    isNavigating = true;
+  });
+}
+
 /**
  * Fetch with authentication and error handling
  */
@@ -35,18 +44,26 @@ export async function fetchWithAuth(endpoint: string, options: FetchOptions = {}
     };
     
     // Set up a timeout if specified
-    const timeout = options.timeout || 20000; // 20 seconds default timeout
+    const timeout = options.timeout || 30000; // 30 seconds default timeout
     
     // Create abort controller for timeout
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    const timeoutId = setTimeout(() => {
+      // Only abort if we're not navigating away
+      if (!isNavigating) {
+        controller.abort();
+      }
+    }, timeout);
+    
+    // Add our signal to the options
+    const signal = controller.signal;
     
     // Execute request
     console.log(`API Request: ${API_BASE_URL}${normalizedEndpoint}`);
     const response = await fetch(`${API_BASE_URL}${normalizedEndpoint}`, {
       ...options,
       headers,
-      signal: controller.signal
+      signal
     });
     
     // Clear timeout
@@ -58,8 +75,10 @@ export async function fetchWithAuth(endpoint: string, options: FetchOptions = {}
       // Unauthorized - clear token and redirect to login
       localStorage.removeItem('token');
       
-      // Throw specific error for 401
-      throw new Error('Authentication required. Please log in.');
+      // Only throw error if we're not already navigating to login
+      if (!isNavigating && !window.location.pathname.includes('/auth/login')) {
+        throw new Error('Authentication required. Please log in.');
+      }
     }
     
     // Handle error responses
@@ -76,9 +95,15 @@ export async function fetchWithAuth(endpoint: string, options: FetchOptions = {}
     
     // Return response data
     return await response.json();
-  } catch (error) {
+  } catch (error: unknown) {
+    // Ignore errors during navigation
+    if (isNavigating) {
+      console.log('Request canceled due to navigation');
+      return null;
+    }
+    
     // Handle timeout errors
-    if (error.name === 'AbortError') {
+    if (error instanceof Error && error.name === 'AbortError') {
       console.error('API request timeout');
       throw new Error('Request timed out. Please try again later.');
     }
