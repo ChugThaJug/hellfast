@@ -51,28 +51,23 @@ class Settings(BaseSettings):
     PADDLE_WEBHOOK_SECRET: Optional[str] = os.getenv("PADDLE_WEBHOOK_SECRET", "")
     PADDLE_SANDBOX: bool = os.getenv("PADDLE_SANDBOX", "true").lower() == "true"
 
-    # Paddle Plan IDs for Free/Pro/Max structure
+    # In app/core/settings.py
+
+    # First ensure these variables are defined
     PADDLE_PRO_PLAN_ID: Optional[str] = os.getenv("PADDLE_PRO_PLAN_ID", "")
     PADDLE_PRO_YEARLY_PLAN_ID: Optional[str] = os.getenv("PADDLE_PRO_YEARLY_PLAN_ID", "")
     PADDLE_MAX_PLAN_ID: Optional[str] = os.getenv("PADDLE_MAX_PLAN_ID", "")
     PADDLE_MAX_YEARLY_PLAN_ID: Optional[str] = os.getenv("PADDLE_MAX_YEARLY_PLAN_ID", "")
 
-    # Helper function for development mode plan IDs
-    def get_plan_id_with_fallback(self, env_var: str, plan_type: str) -> str:
-        """Get plan ID with development fallback."""
-        plan_id = getattr(self, env_var, "")
-        if not plan_id and self.APP_ENV == "development":
-            return f"dev_{plan_type}_id"
-        return plan_id
+    # Then update the SUBSCRIPTION_PLANS
 
-    # Update subscription plans with correct Paddle IDs
     SUBSCRIPTION_PLANS: Dict[str, Dict] = {
         "free": {
             "name": "Free",
             "price": 0,
             "monthly_quota": 3,
             "features": ["simple_mode", "bullet_points", "summary"],
-            "max_video_length": 10,  # in minutes
+            "max_video_length": 10,
             "paddle_plan_id": None  # Free plans don't need Paddle IDs
         },
         "pro": {
@@ -81,7 +76,7 @@ class Settings(BaseSettings):
             "yearly_price": 49.99,
             "monthly_quota": 15,
             "features": ["simple_mode", "detailed_mode", "bullet_points", "summary", "step_by_step"],
-            "max_video_length": 30,  # in minutes
+            "max_video_length": 30,
             "paddle_plan_id": PADDLE_PRO_PLAN_ID,
             "paddle_yearly_plan_id": PADDLE_PRO_YEARLY_PLAN_ID
         },
@@ -91,7 +86,7 @@ class Settings(BaseSettings):
             "yearly_price": 99.99,
             "monthly_quota": 50,
             "features": ["simple_mode", "detailed_mode", "bullet_points", "summary", "step_by_step", "podcast_article", "api_access"],
-            "max_video_length": 120,  # in minutes (2 hours)
+            "max_video_length": 120,
             "paddle_plan_id": PADDLE_MAX_PLAN_ID,
             "paddle_yearly_plan_id": PADDLE_MAX_YEARLY_PLAN_ID
         }
@@ -143,6 +138,20 @@ class Settings(BaseSettings):
     
     # Cache retention (days)
     CACHE_RETENTION_DAYS: int = 7
+
+    # Add this method to the Settings class in app/core/settings.py
+
+    def ensure_plan_ids(self):
+        """Ensure all plan IDs are correctly assigned from environment variables."""
+        if "pro" in self.SUBSCRIPTION_PLANS:
+            self.SUBSCRIPTION_PLANS["pro"]["paddle_plan_id"] = self.PADDLE_PRO_PLAN_ID
+            self.SUBSCRIPTION_PLANS["pro"]["paddle_yearly_plan_id"] = self.PADDLE_PRO_YEARLY_PLAN_ID
+        
+        if "max" in self.SUBSCRIPTION_PLANS:
+            self.SUBSCRIPTION_PLANS["max"]["paddle_plan_id"] = self.PADDLE_MAX_PLAN_ID
+            self.SUBSCRIPTION_PLANS["max"]["paddle_yearly_plan_id"] = self.PADDLE_MAX_YEARLY_PLAN_ID
+
+
     
     # System prompts
     SYSTEM_PROMPTS: Dict[str, str] = {
@@ -184,9 +193,13 @@ class Settings(BaseSettings):
         """Validate and create required directories."""
         for directory in [self.CACHE_DIR, self.DOWNLOAD_DIR, self.OUTPUT_DIR, self.SCREENSHOTS_DIR]:
             os.makedirs(directory, exist_ok=True)
+            
+
 
 # Initialize settings
 settings = Settings()
+# Then call it at the end of settings.py, after creating the settings instance
+settings.ensure_plan_ids()
 
 # Create necessary directories
 # settings.validate_directories()

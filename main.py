@@ -95,6 +95,44 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "An unexpected error occurred. Please try again later."}
     )
 
+
+# Add this debug endpoint after your other endpoints (before if __name__ == "__main__")
+@app.get("/debug/settings", include_in_schema=settings.APP_ENV == "development")
+async def debug_settings():
+    """Debug endpoint to check settings (only available in development mode)."""
+    if settings.APP_ENV != "development":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Debug endpoints only available in development mode"
+        )
+    
+    subscription_plans = {}
+    for plan_id, plan_data in settings.SUBSCRIPTION_PLANS.items():
+        # Create a copy to avoid modifying the original
+        plan_info = dict(plan_data)
+        # Add paddle IDs specifically for debugging
+        if plan_id == "pro":
+            plan_info["debug_paddle_id"] = settings.PADDLE_PRO_PLAN_ID
+            plan_info["debug_paddle_yearly_id"] = settings.PADDLE_PRO_YEARLY_PLAN_ID
+        elif plan_id == "max":
+            plan_info["debug_paddle_id"] = settings.PADDLE_MAX_PLAN_ID
+            plan_info["debug_paddle_yearly_id"] = settings.PADDLE_MAX_YEARLY_PLAN_ID
+        subscription_plans[plan_id] = plan_info
+    
+    return {
+        "app_env": settings.APP_ENV,
+        "paddle_sandbox": settings.PADDLE_SANDBOX,
+        "paddle_api_key_configured": bool(settings.PADDLE_API_KEY),
+        "paddle_webhook_secret_configured": bool(settings.PADDLE_WEBHOOK_SECRET),
+        "paddle_plan_ids": {
+            "pro": settings.PADDLE_PRO_PLAN_ID,
+            "pro_yearly": settings.PADDLE_PRO_YEARLY_PLAN_ID,
+            "max": settings.PADDLE_MAX_PLAN_ID,
+            "max_yearly": settings.PADDLE_MAX_YEARLY_PLAN_ID
+        },
+        "subscription_plans": subscription_plans
+    }
+
 # Import routers - do this AFTER app is created
 from app.api.routes import youtube, subscription, oauth, webhook
 from app.api.routes.auth_api import router as auth_router
@@ -157,6 +195,8 @@ async def get_profile(
         profile["photo_url"] = current_user.photo_url
     
     return profile
+
+
 
 if __name__ == "__main__":
     import uvicorn
