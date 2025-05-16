@@ -189,4 +189,4 @@ class Settings(BaseSettings):
 settings = Settings()
 
 # Create necessary directories
-settings.validate_directories()
+# settings.validate_directories()
