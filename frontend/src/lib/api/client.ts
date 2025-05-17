@@ -1,6 +1,25 @@
 // frontend/src/lib/api/client.ts
 import { browser } from '$app/environment';
 
+// Determine API URL dynamically
+const getApiUrl = () => {
+  // Check if running on Cloudflare Pages
+  const isCloudflare = window.location.hostname.includes('pages.dev') || 
+    window.location.hostname !== 'localhost';
+    
+  if (isCloudflare) {
+    // Running on Cloudflare - use local backend or deployed backend
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    console.log(`Using API URL: ${apiUrl}`);
+    return apiUrl;
+  }
+  
+  // Local development - use relative path which gets proxied by Vite
+  return '';
+};
+
+export const API_URL = getApiUrl();
+
 // API Base URL from environment or default
 const API_BASE_URL = browser 
   ? import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'

@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: hellfast
+    env: python
+    buildCommand: pip install -r requirements.txt && cd frontend && npm ci && npm run build && cd ..
+    startCommand: python main.py
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: PADDLE_SANDBOX
+        value: true
+      - key: PORT
+        value: 8000
