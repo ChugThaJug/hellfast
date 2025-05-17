@@ -1,15 +1,13 @@
 #!/bin/bash
 
-# Create the output directory
-mkdir -p dist
+# First install dependencies with regular npm install
+npm install
 
-# Copy the index.html file to the output directory
-cp index.html dist/
+# Then build the project
+npm run build
 
-# Create a simple CSS file
-echo "body { font-family: sans-serif; }" > dist/styles.css
+# Ensure _redirects file is copied to the build directory
+cp _redirects build/ 2>/dev/null || :
+cp static/_redirects build/ 2>/dev/null || :
 
-# Create a simple JS file
-echo "console.log('Hellfast is running!');" > dist/script.js
-
-echo "Build completed successfully!"
+echo "Build completed successfully"

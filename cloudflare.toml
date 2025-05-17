@@ -1,0 +1,13 @@
+# Cloudflare Pages configuration
+
+[build]
+  command = "cd frontend && chmod +x build.sh && ./build.sh"
+  publish = "frontend/build"
+  
+[build.environment]
+  NODE_VERSION = "18"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
