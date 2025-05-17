@@ -1,12 +1,8 @@
 {
-  "name": "hellfast",
+  "name": "hellfast-static",
   "version": "1.0.0",
-  "description": "Hellfast application",
   "private": true,
   "scripts": {
-    "build": "cd frontend && npm run build"
-  },
-  "engines": {
-    "node": ">=16.0.0"
+    "build": "echo 'Static HTML build - no build step needed'"
   }
 }
