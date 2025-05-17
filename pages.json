@@ -1,0 +1,13 @@
+{
+  "build": {
+    "command": "chmod +x cloudflare-build.sh && ./cloudflare-build.sh",
+    "output": "frontend/build"
+  },
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ],
+  "buildConfig": {
+    "nodeVersion": "18"
+  }
+}

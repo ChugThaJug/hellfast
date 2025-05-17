@@ -5,7 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
-		"build": "vite build && cp _redirects build/",
+		"build": "npm install --no-package-lock && vite build",
 		"preview": "vite preview"
 	},
 	"devDependencies": {
