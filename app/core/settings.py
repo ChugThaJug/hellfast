@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     VERCEL_URL: ClassVar[str] = ''
     FRONTEND_URL: ClassVar[str] = 'http://localhost:5173'
     
+    # Add missing APP_TITLE attribute
+    APP_TITLE: str = "Hellfast API"
+    
     # App settings
     APP_ENV: str = "development"
     DEBUG: bool = True

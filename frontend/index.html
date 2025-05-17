@@ -75,8 +75,11 @@
       const backendUrl = document.getElementById('backend-url');
       const currentUrl = document.getElementById('current-url');
       
-      // Show backend URL from env or default
-      backendUrl.textContent = window.ENV_API_URL || 'http://localhost:8000';
+      // Show backend URL from Cloudflare Pages environment variables
+      // Access any environment variables exposed to the client
+      const apiUrl = typeof VITE_API_URL !== 'undefined' ? 
+                    VITE_API_URL : 'http://localhost:8000';
+      backendUrl.textContent = apiUrl;
       
       // Show current domain
       currentUrl.textContent = window.location.origin;
