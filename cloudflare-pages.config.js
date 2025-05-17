@@ -1,12 +1,13 @@
-// Cloudflare Pages build configuration
-export default {
+// Cloudflare Pages configuration
+module.exports = {
   build: {
-    command: 'cd frontend && npm install && npm run build',
-    directory: 'frontend/dist',
-    publicPath: '/'
+    command: "cd frontend && npm install && npm run build",
+    directory: "frontend/.svelte-kit/output/client",
+    environment: {
+      NODE_VERSION: "18"
+    }
   },
   routes: [
-    { pattern: '/assets/*', path: '/assets/:splat' },
-    { pattern: '/*', path: '/index.html', headers: { 'Cache-Control': 'no-cache' } }
+    { pattern: "/*", path: "/index.html", status: 200 }
   ]
-}
+};
