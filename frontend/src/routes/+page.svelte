@@ -1,4 +1,3 @@
-<!-- frontend/src/routes/+page.svelte -->
 <script lang="ts">
   import { Search } from "lucide-svelte";
   import VideoProcessForm from "$lib/components/video/VideoProcessForm.svelte";
