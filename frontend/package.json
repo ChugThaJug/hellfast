@@ -4,6 +4,8 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"build": "mkdir -p dist && cp index.html dist/index.html && echo 'Build completed'"
+			"dev": "vite dev",
+			"build": "vite build",
+			"preview": "vite preview"
 	}
 }

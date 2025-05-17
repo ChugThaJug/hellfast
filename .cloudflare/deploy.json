@@ -1,0 +1,23 @@
+{
+  "build": {
+    "command": "cd frontend && npm install && npm run build",
+    "cwd": ".",
+    "environment": {
+      "NODE_VERSION": "18"
+    },
+    "output_directory": "frontend/build"
+  },
+  "compatibility_flags": ["nodejs_compat"],
+  "routes": [
+    { 
+      "pattern": "/api/*", 
+      "script": "/api/handler.js",
+      "enabled": false
+    },
+    { 
+      "pattern": "/*", 
+      "file": "/index.html", 
+      "status": 200 
+    }
+  ]
+}
