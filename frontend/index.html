@@ -4,12 +4,83 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Hellfast</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      line-height: 1.5;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem;
+      text-align: center;
+    }
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 2rem;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      margin: 2rem 0;
+    }
+    .btn {
+      background: #0078ff;
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 4px;
+      text-decoration: none;
+      font-weight: bold;
+      display: inline-block;
+      cursor: pointer;
+    }
+    .info {
+      background: #f5f5f5;
+      padding: 1rem;
+      border-radius: 4px;
+      margin-top: 1rem;
+    }
+  </style>
 </head>
 <body>
-  <div id="app"></div>
-  <script type="module">
-    // Inline script to avoid path resolution issues
-    window.location.href = '/app';
+  <div class="container">
+    <h1>Hellfast Application</h1>
+    <p>Frontend successfully deployed to Cloudflare Pages!</p>
+    
+    <div class="card">
+      <h2>Backend Connection</h2>
+      <p>The backend should be running at:</p>
+      <div class="info">
+        <code id="backend-url">Loading...</code>
+      </div>
+      
+      <div style="margin-top: 2rem;">
+        <a href="/auth/login" class="btn">Go to Login</a>
+      </div>
+    </div>
+    
+    <div class="card">
+      <h2>Paddle Integration</h2>
+      <p>Configure your Paddle integration by adding this domain to your approved domains list.</p>
+      <div class="info">
+        <p>Current domain: <code id="current-url">Loading...</code></p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Simple script to display environment info
+    document.addEventListener('DOMContentLoaded', function() {
+      const backendUrl = document.getElementById('backend-url');
+      const currentUrl = document.getElementById('current-url');
+      
+      // Show backend URL from env or default
+      backendUrl.textContent = window.ENV_API_URL || 'http://localhost:8000';
+      
+      // Show current domain
+      currentUrl.textContent = window.location.origin;
+    });
   </script>
 </body>
 </html>

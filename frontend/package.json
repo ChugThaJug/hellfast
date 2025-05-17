@@ -1,12 +1,9 @@
 {
-	"name": "frontend",
-	"version": "0.0.1",
+	"name": "hellfast-static",
+	"version": "1.0.0",
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"build": "vite build"
-	},
-	"devDependencies": {
-		"vite": "^5.0.0"
+		"build": "mkdir -p dist && cp index.html dist/index.html && echo 'Build completed'"
 	}
 }
