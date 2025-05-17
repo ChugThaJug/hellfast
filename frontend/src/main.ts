@@ -1,4 +1,9 @@
-// This file serves as the entry point for the application
-// It imports the main app from the generated SvelteKit bundle
+// Simple standalone entry point for Cloudflare Pages build
+import { createApp } from './lib/app';
 
-import './app.js';
+// Create and mount the app
+const app = createApp();
+document.getElementById('app')?.appendChild(app);
+
+// Export for potential SSR usage
+export default app;

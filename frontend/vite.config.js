@@ -8,8 +8,13 @@ export default defineConfig({
   // Specify the correct entry point
   root: __dirname,
   build: {
-    outDir: resolve(__dirname, 'dist'),
+    outDir: './dist',
+    target: 'esnext',
+    minify: 'terser',
     emptyOutDir: true
+  },
+  resolve: {
+    extensions: ['.ts', '.js', '.json']
   },
   server: {
     proxy: {
