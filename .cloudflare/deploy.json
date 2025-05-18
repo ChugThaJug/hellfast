@@ -1,7 +1,6 @@
 {
   "build": {
-    "command": "cd frontend && ./build-cloudflare.sh",
-    "cwd": ".",
+    "command": "cd frontend && npm install && npm run build",
     "environment": {
       "NODE_VERSION": "18"
     },
@@ -9,11 +8,6 @@
   },
   "compatibility_flags": ["nodejs_compat"],
   "routes": [
-    { 
-      "pattern": "/api/*", 
-      "script": "/api/handler.js",
-      "enabled": false
-    },
     { 
       "pattern": "/*", 
       "file": "/index.html", 
