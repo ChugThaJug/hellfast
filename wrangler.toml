@@ -1,4 +1,5 @@
 name = "hellfast-frontend"
+workers_dev = true
 
 [build]
 command = "cd frontend && npm install --legacy-peer-deps && npm run build"
@@ -8,8 +9,10 @@ bucket = "./frontend/build"
 
 [build.upload]
 format = "directory"
-main = "./frontend/build/index.html"
 dir = "./frontend/build"
 
 [pages]
 build_output_dir = "frontend/build"
+root_dir = "frontend"
+
+compatibility_date = "2023-10-30"
