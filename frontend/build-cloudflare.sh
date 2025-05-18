@@ -2,9 +2,9 @@
 
 echo "Starting Cloudflare Pages build process..."
 
-# Install dependencies using standard npm install
+# Install dependencies using legacy-peer-deps to avoid conflicts
 echo "Installing dependencies..."
-npm install
+npm install --legacy-peer-deps
 
 # Build the project
 echo "Building project..."

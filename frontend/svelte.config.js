@@ -6,7 +6,6 @@ const config = {
   preprocess: vitePreprocess(),
   kit: {
     adapter: adapter({
-      // Use "build" instead of "dist" for output directory
       pages: 'build',
       assets: 'build',
       fallback: 'index.html',
