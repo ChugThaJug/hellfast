@@ -1,16 +1,18 @@
 name = "hellfast-frontend"
-workers_dev = true
 
+# Use a more robust build approach that avoids package-lock issues
 [build]
-command = "cd frontend && npm install --legacy-peer-deps postcss-nesting && npm run build"
+command = "cd frontend && npm install --no-package-lock && npm run build"
 
 [site]
 bucket = "./frontend/build"
 
+# Configure build upload correctly
 [build.upload]
 format = "directory"
 dir = "./frontend/build"
 
+# Make sure to use exactly this property name for Pages integration
 [pages]
 pages_build_output_dir = "frontend/build"
 root_dir = "frontend"
