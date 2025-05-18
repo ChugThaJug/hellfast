@@ -26,5 +26,12 @@
   "env": {
     "PADDLE_SANDBOX": "true",
     "APP_ENV": "development"
-  }
+  },
+  "buildCommand": "cd frontend && npm install --no-package-lock && npm run build",
+  "outputDirectory": "frontend/build",
+  "framework": "sveltekit",
+  "installCommand": "cd frontend && npm install --no-package-lock",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }

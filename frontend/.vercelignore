@@ -1,0 +1,6 @@
+.git
+__sapper__
+node_modules
+.svelte-kit
+.DS_Store
+package-lock.json
