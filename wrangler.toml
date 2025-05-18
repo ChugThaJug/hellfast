@@ -2,7 +2,7 @@ name = "hellfast-frontend"
 workers_dev = true
 
 [build]
-command = "cd frontend && npm install --legacy-peer-deps && npm run build"
+command = "cd frontend && npm install --legacy-peer-deps postcss-nesting && npm run build"
 
 [site]
 bucket = "./frontend/build"
@@ -12,7 +12,7 @@ format = "directory"
 dir = "./frontend/build"
 
 [pages]
-build_output_dir = "frontend/build"
+pages_build_output_dir = "frontend/build"
 root_dir = "frontend"
 
 compatibility_date = "2023-10-30"
