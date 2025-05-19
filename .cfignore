@@ -1,4 +1,0 @@
-# Ignore backend files
-*.py
-app/
-requirements*.txt

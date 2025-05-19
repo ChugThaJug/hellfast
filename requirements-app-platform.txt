@@ -1,8 +1,0 @@
-# App Platform compatible dependencies
-PyYAML==6.0
-pydantic==2.0.3
-fastapi==0.100.0
-uvicorn==0.23.2
-# Include your other dependencies below without versions
-# and this file will install compatible versions
--r requirements.txt
