@@ -1,5 +1,6 @@
 import os
 from pydantic_settings import BaseSettings
+from pydantic import Field
 from typing import Dict, List, Any, Optional, ClassVar, Union
 
 # Setup environment variables
@@ -10,6 +11,10 @@ class Settings(BaseSettings):
     
     # Add missing APP_TITLE attribute
     APP_TITLE: str = "Hellfast API"
+
+    APP_DESCRIPTION: str = "YouTube Processing API"  # Or whatever description you want
+    APP_VERSION: str = "0.1.0"
+    
     
     # App settings
     APP_ENV: str = "development"
@@ -38,6 +43,8 @@ class Settings(BaseSettings):
     # Paddle settings
     PADDLE_API_KEY: str = ""
     PADDLE_WEBHOOK_SECRET: str = ""
+
+    # Hardcode PADDLE_SANDBOX to bypass env issue
     PADDLE_SANDBOX: bool = True
     
     # Plan IDs
@@ -60,6 +67,22 @@ class Settings(BaseSettings):
     # Uploads and temporary directories
     UPLOADS_DIR: str = "uploads"
     TEMP_DIR: str = "temp"
+    CACHE_DIR: str = "cache"
+    DOWNLOAD_DIR: str = "downloads"
+    OUTPUT_DIR: str = "processed"
+    SCREENSHOTS_DIR: str = "screenshots"
+    
+    # Token price configuration
+    TOKEN_PRICES: Dict[str, Dict[str, float]] = {
+        'gpt-4o': {'input': 5/1000000, 'output': 15/1000000},
+        'gpt-4o-mini': {'input': 0.15/1000000, 'output': 0.6/1000000},
+        'gpt-3.5-turbo': {'input': 0.5/1000000, 'output': 1.5/1000000}
+    }
+    
+    DEFAULT_TOKEN_PRICE: Dict[str, float] = {
+        'input': 0.0001,
+        'output': 0.0002
+    }
     
     # Subscription plans configuration
     SUBSCRIPTION_PLANS: ClassVar[Dict[str, Dict[str, Any]]] = {
@@ -91,6 +114,10 @@ class Settings(BaseSettings):
             "paddle_yearly_plan_id": "",
         }
     }
+    
+    def get_token_price(self, model: str) -> Dict[str, float]:
+        """Get token prices for specified model."""
+        return self.TOKEN_PRICES.get(model, self.DEFAULT_TOKEN_PRICE)
 
     class Config:
         env_file = ".env"
@@ -107,6 +134,7 @@ class Settings(BaseSettings):
 settings = Settings()
 
 # Ensure directories exist
-for directory in [settings.UPLOADS_DIR, settings.TEMP_DIR]:
+for directory in [settings.UPLOADS_DIR, settings.TEMP_DIR, settings.CACHE_DIR, 
+                  settings.DOWNLOAD_DIR, settings.OUTPUT_DIR, settings.SCREENSHOTS_DIR]:
     if directory:
         os.makedirs(directory, exist_ok=True)
