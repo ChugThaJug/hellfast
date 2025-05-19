@@ -64,7 +64,7 @@ Hellfast is configured for deployment on Cloudflare Pages using either Git integ
    - Select your GitHub repository
    - Configure build settings:
      - Framework preset: None (Custom)
-     - Build command: `PowerShell -ExecutionPolicy Bypass -File ./cloudflare-build.ps1`
+     - Build command: `bash ./build-cloudflare.sh` (recommended) or `PowerShell -ExecutionPolicy Bypass -File ./cloudflare-build.ps1` (alternative)
      - Build output directory: `build`
      - Root directory: `/frontend` (if your repository has the frontend in a subfolder)
      - Node.js version: 18
@@ -120,9 +120,53 @@ If you encounter package synchronization problems, run:
 ./fix-packages.ps1
 ```
 
+### Cloudflare Pages Deployment Issues
+If you encounter issues deploying to Cloudflare Pages:
+
+1. **Wrangler.toml Errors**: Make sure your wrangler.toml file is simplified and only includes the essential configuration:
+   ```toml
+   # wrangler.toml for Cloudflare Pages deployment
+   name = "hellfast-frontend"
+   pages_build_output_dir = "build"
+   compatibility_flags = ["nodejs_compat"]
+
+   [[routes]]
+   pattern = "/*"
+   fallback = "index.html"
+   ```
+
+2. **Build Command Errors**: If the PowerShell build script fails, use the Bash version instead:
+   ```
+   bash ./build-cloudflare.sh
+   ```
+
+3. **Build Environment**: Ensure you're using Node.js 18 or later in your Cloudflare Pages settings.
+
+4. **Manual Deployment**: If Git-based deployment continues to fail, use Wrangler CLI to deploy directly from your local machine.
+
 ## Custom Domain Setup
 
 1. In Cloudflare Pages, go to your project settings
 2. Click on "Custom domains"
 3. Add your custom domain
 4. Update DNS settings according to Cloudflare instructions
+
+## Continuous Integration/Deployment
+
+This project includes GitHub Actions workflows for automated testing and deployment.
+
+### GitHub Actions Setup
+
+1. **Repository Secrets**
+   Add the following secrets in your GitHub repository settings:
+   - `CLOUDFLARE_API_TOKEN`: Your Cloudflare API token with Pages access
+   - `PRODUCTION_API_URL`: Your backend API URL
+
+2. **Workflow Configuration**
+   The workflow is defined in `.github/workflows/deploy.yml` and includes:
+   - Automated testing
+   - Building the frontend
+   - Deploying to Cloudflare Pages
+
+3. **Manual Deployment**
+   You can trigger a deployment manually from the "Actions" tab in your GitHub repository.

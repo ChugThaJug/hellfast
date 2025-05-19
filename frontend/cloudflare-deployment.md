@@ -13,7 +13,7 @@ This guide explains how to deploy the frontend on Cloudflare Pages with the late
    - Select your GitHub repository
    - Configure the build settings:
      - Framework preset: None (Custom)
-     - Build command: `PowerShell -ExecutionPolicy Bypass -File ./cloudflare-build.ps1`
+     - Build command: `bash ./build-cloudflare.sh` (recommended) or `PowerShell -ExecutionPolicy Bypass -File ./cloudflare-build.ps1`
      - Build output directory: `build`
      - Root directory: `/frontend` (if your repository has the frontend in a subfolder)
      - Node.js version: 18
@@ -71,3 +71,54 @@ When running locally:
 3. Add your custom domain
 4. Update DNS settings according to Cloudflare instructions
 5. Update your Paddle dashboard with the custom domain
+
+## Troubleshooting Common Deployment Issues
+
+### Wrangler Configuration Errors
+
+If you see errors related to the wrangler.toml file:
+
+1. **Update to a simplified configuration**:
+   ```toml
+   # wrangler.toml for Cloudflare Pages deployment
+   name = "hellfast-frontend"
+   pages_build_output_dir = "build"
+   compatibility_flags = ["nodejs_compat"]
+
+   [[routes]]
+   pattern = "/*"
+   fallback = "index.html"
+   ```
+
+2. **Consider removing the wrangler.toml** file entirely for Cloudflare Pages Git deployments and rely on the UI configuration.
+
+### Build Command Errors
+
+If the PowerShell build script fails:
+
+1. **Use the Bash script instead**: 
+   - Change the build command to: `bash ./build-cloudflare.sh`
+
+2. **Directly use npm commands**:
+   ```
+   npm install && npm run build
+   ```
+
+### Environment Variable Issues
+
+If your application is not connecting to the API:
+
+1. Check that environment variables are correctly set in Cloudflare Pages dashboard
+2. Verify the variables are being properly loaded during the build process
+3. You can inspect build logs in the Cloudflare Pages dashboard
+
+### Manual Deployment Fallback
+
+If all else fails, build locally and deploy with Wrangler:
+
+```bash
+cd frontend
+npm install
+npm run build
+npx wrangler pages deploy build --project-name hellfast
+```

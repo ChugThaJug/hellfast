@@ -4,20 +4,10 @@ name = "hellfast-frontend"
 # Define the build output directory for Pages
 pages_build_output_dir = "build"
 
-# Configure build settings
-[build]
-command = "npm run build"
-upload.format = "directory"
-upload.dir = "build"
-
-# Configure environment
-[build.environment]
-NODE_VERSION = "18"
-
 # Compatibility flags
 compatibility_flags = ["nodejs_compat"]
 
-# Configure routes for SPA
-routes = [
-  { pattern = "/*", fallback = "index.html" }
-]
+# Routes configuration for SPA
+[[routes]]
+pattern = "/*"
+fallback = "index.html"
