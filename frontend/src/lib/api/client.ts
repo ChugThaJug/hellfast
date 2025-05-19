@@ -1,29 +1,9 @@
 // frontend/src/lib/api/client.ts
 import { browser } from '$app/environment';
+import { goto } from '$app/navigation';
 
-// Determine API URL dynamically
-const getApiUrl = () => {
-  // Check if running on Cloudflare Pages
-  const isCloudflare = window.location.hostname.includes('pages.dev') || 
-    window.location.hostname !== 'localhost';
-    
-  if (isCloudflare) {
-    // Running on Cloudflare - use local backend or deployed backend
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-    console.log(`Using API URL: ${apiUrl}`);
-    return apiUrl;
-  }
-  
-  // Local development - use relative path which gets proxied by Vite
-  return '';
-};
-
-export const API_URL = getApiUrl();
-
-// API Base URL from environment or default
-const API_BASE_URL = browser 
-  ? import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-  : 'http://localhost:8000';
+// Simple API URL without any window references
+export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 // Options type for fetchWithAuth
 interface FetchOptions extends RequestInit {
@@ -31,23 +11,20 @@ interface FetchOptions extends RequestInit {
   timeout?: number;
 }
 
-// Track page navigation to prevent unnecessary errors
-let isNavigating = false;
-if (browser) {
-  // Listen for beforeunload to detect page navigation
-  window.addEventListener('beforeunload', () => {
-    isNavigating = true;
-  });
-}
-
 /**
  * Fetch with authentication and error handling
  */
 export async function fetchWithAuth(endpoint: string, options: FetchOptions = {}) {
   try {
-    // Only get token in browser context
+    // Only run in browser
+    if (!browser) {
+      console.log('API request skipped in SSR mode');
+      return { success: false, message: 'API request skipped in SSR mode' };
+    }
+    
+    // Get token from local storage
     let token = null;
-    if (browser && !options.skipAuth) {
+    if (!options.skipAuth) {
       token = localStorage.getItem('token');
       console.log(`API Request to ${endpoint} - Auth token present: ${!!token}`);
     }
@@ -67,37 +44,25 @@ export async function fetchWithAuth(endpoint: string, options: FetchOptions = {}
     
     // Create abort controller for timeout
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-      // Only abort if we're not navigating away
-      if (!isNavigating) {
-        controller.abort();
-      }
-    }, timeout);
-    
-    // Add our signal to the options
-    const signal = controller.signal;
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
     
     // Execute request
-    console.log(`API Request: ${API_BASE_URL}${normalizedEndpoint}`);
-    const response = await fetch(`${API_BASE_URL}${normalizedEndpoint}`, {
+    console.log(`API Request: ${API_URL}${normalizedEndpoint}`);
+    const response = await fetch(`${API_URL}${normalizedEndpoint}`, {
       ...options,
       headers,
-      signal
+      signal: controller.signal
     });
     
     // Clear timeout
     clearTimeout(timeoutId);
     
-    // Handle common response scenarios
-    if (response.status === 401 && browser) {
+    // Handle unauthorized
+    if (response.status === 401) {
       console.error('Authentication error: Token invalid or expired');
-      // Unauthorized - clear token and redirect to login
       localStorage.removeItem('token');
-      
-      // Only throw error if we're not already navigating to login
-      if (!isNavigating && !window.location.pathname.includes('/auth/login')) {
-        throw new Error('Authentication required. Please log in.');
-      }
+      goto('/auth/login');
+      throw new Error('Authentication required. Please log in.');
     }
     
     // Handle error responses
@@ -115,12 +80,6 @@ export async function fetchWithAuth(endpoint: string, options: FetchOptions = {}
     // Return response data
     return await response.json();
   } catch (error: unknown) {
-    // Ignore errors during navigation
-    if (isNavigating) {
-      console.log('Request canceled due to navigation');
-      return null;
-    }
-    
     // Handle timeout errors
     if (error instanceof Error && error.name === 'AbortError') {
       console.error('API request timeout');

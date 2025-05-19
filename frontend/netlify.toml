@@ -1,10 +1,12 @@
 [build]
-  base = "frontend"
-  publish = "dist"
+  publish = "build"
   command = "npm run build"
 
+[build.environment]
+  NODE_VERSION = "18"
+
 [context.production.environment]
-  VITE_API_URL = "https://your-backend-url.onrender.com"
+  VITE_API_URL = "https://hellfast-api.onrender.com"
   
 [[redirects]]
   from = "/*"

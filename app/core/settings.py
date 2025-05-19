@@ -1,7 +1,7 @@
 import os
 from pydantic_settings import BaseSettings
 from pydantic import Field
-from typing import Dict, List, Any, Optional, ClassVar, Union
+from typing import Dict, List, Any, ClassVar
 
 # Setup environment variables
 class Settings(BaseSettings):
@@ -30,15 +30,15 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:4173"]
     
     # Security settings
-    SECRET_KEY: str = "your-secret-key-here"
+    SECRET_KEY: str = Field(env="SECRET_KEY", default="your-secret-key-here")
     ALGORITHM: ClassVar[str] = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 1 day
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(env="ACCESS_TOKEN_EXPIRE_MINUTES", default=60 * 24)  # 1 day
     
     # Database settings
-    DATABASE_URL: str = "sqlite:///./test.db"
+    DATABASE_URL: str = Field(env="DATABASE_URL", default="sqlite:///./test.db")
     
     # Model settings
-    MODEL: str = "gpt-3.5-turbo"
+    MODEL: str = Field(env="MODEL", default="gpt-3.5-turbo")
     
     # Paddle settings
     PADDLE_API_KEY: str = ""
