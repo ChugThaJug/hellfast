@@ -1,6 +1,6 @@
-# Cloudflare Pages Deployment Guide
+# Cloudflare Pages Deployment Guide (Updated)
 
-This guide explains how to deploy the frontend on Cloudflare Pages while keeping the backend running locally.
+This guide explains how to deploy the frontend on Cloudflare Pages with a proper configuration.
 
 ## Setup Steps
 
@@ -12,13 +12,15 @@ This guide explains how to deploy the frontend on Cloudflare Pages while keeping
    - Click "Create a project"
    - Select your GitHub repository
    - Configure the build settings:
-     - Framework preset: Svelte
-     - Build command: `npm run build`
-     - Build output directory: `dist`
+     - Framework preset: None (Custom)
+     - Build command: `bash cloudflare-build.sh`
+     - Build output directory: `build`
      - Root directory: `/frontend` (if your repository has the frontend in a subfolder)
+     - Node.js version: 18
 
 3. **Add Environment Variables**
-   - Add `VITE_API_URL=http://localhost:8000` for local development
+   - For production: `VITE_API_URL=https://hellfast-api.onrender.com` (or your actual API URL)
+   - For local testing: `VITE_API_URL=http://localhost:8000`
    - For production, you'll update this to your actual backend URL
 
 4. **Deploy**
