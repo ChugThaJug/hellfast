@@ -1,0 +1,22 @@
+# wrangler.toml for Cloudflare Pages deployment
+name = "hellfast-frontend"
+
+# Configure build settings
+[build]
+command = "npm run build"
+upload.format = "directory"
+upload.dir = "build"
+node_compat = true
+
+# Configure environment
+[build.environment]
+NODE_VERSION = "18"
+
+# Configure routes for SPA
+[[routes]]
+pattern = "/*"
+script = ""
+
+# Compatibility flags
+[compatibility_flags]
+nodejs_compat = true

@@ -19,7 +19,7 @@ npm install
 
 # Build the project
 Write-Host "Building project..." -ForegroundColor Cyan
-npm run build
+npm run build:cloudflare || npm run build  # Fallback to regular build if cloudflare-specific build fails
 
 # Ensure the _redirects file is in place for SPA routing
 Write-Host "Creating _redirects file for SPA routing..." -ForegroundColor Cyan

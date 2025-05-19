@@ -1,6 +1,6 @@
-# Cloudflare Pages Deployment Guide (Updated)
+# Cloudflare Pages Deployment Guide (May 2025 Update)
 
-This guide explains how to deploy the frontend on Cloudflare Pages with a proper configuration.
+This guide explains how to deploy the frontend on Cloudflare Pages with the latest configuration.
 
 ## Setup Steps
 
@@ -13,7 +13,7 @@ This guide explains how to deploy the frontend on Cloudflare Pages with a proper
    - Select your GitHub repository
    - Configure the build settings:
      - Framework preset: None (Custom)
-     - Build command: `bash cloudflare-build.sh`
+     - Build command: `PowerShell -ExecutionPolicy Bypass -File ./cloudflare-build.ps1`
      - Build output directory: `build`
      - Root directory: `/frontend` (if your repository has the frontend in a subfolder)
      - Node.js version: 18
@@ -21,6 +21,27 @@ This guide explains how to deploy the frontend on Cloudflare Pages with a proper
 3. **Add Environment Variables**
    - For production: `VITE_API_URL=https://hellfast-api.onrender.com` (or your actual API URL)
    - For local testing: `VITE_API_URL=http://localhost:8000`
+   
+## Alternative Method: Direct Upload
+
+If you're having issues with the Git-based deployment, you can use Wrangler to deploy directly:
+
+1. **Install Wrangler CLI**
+   ```powershell
+   npm install -g wrangler
+   ```
+
+2. **Login to Cloudflare**
+   ```powershell
+   wrangler login
+   ```
+
+3. **Build and Deploy**
+   ```powershell
+   cd frontend
+   npm run build
+   wrangler pages deploy build --project-name hellfast
+   ```
    - For production, you'll update this to your actual backend URL
 
 4. **Deploy**

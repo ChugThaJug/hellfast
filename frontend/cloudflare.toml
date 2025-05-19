@@ -1,5 +1,5 @@
 [build]
-  command = "bash cloudflare-build.sh"
+  command = "PowerShell -ExecutionPolicy Bypass -File ./cloudflare-build.ps1"
   publish = "build"
 
 [build.environment]
