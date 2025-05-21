@@ -2,7 +2,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import ProtectedRoute from "$lib/components/auth/ProtectedRoute.svelte";
-  import { XCircle } from "lucide-svelte";
 </script>
 
 <svelte:head>
@@ -13,7 +12,6 @@
   <div class="container mx-auto px-4 py-16">
     <div class="max-w-md mx-auto bg-background border rounded-lg p-8 shadow-sm text-center">
       <div class="w-16 h-16 bg-yellow-100 text-yellow-700 mx-auto rounded-full flex items-center justify-center mb-4">
-        <XCircle class="h-8 w-8" />
       </div>
       
       <h1 class="text-2xl font-bold mb-2">Subscription Cancelled</h1>

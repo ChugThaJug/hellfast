@@ -1,6 +1,5 @@
 <!-- frontend/src/routes/pricing/+page.svelte -->
 <script lang="ts">
-  import { Check } from "lucide-svelte";
   import { onMount } from "svelte";
   import { subscriptionApi } from "$lib/api";
   import { goto } from "$app/navigation";
@@ -98,26 +97,22 @@
             <ul class="space-y-2">
               {#if plan.id === 'pro'}
                 <li class="flex items-center">
-                  <Check class="h-4 w-4 text-primary mr-2" />
                   <span>Everything in Free</span>
                 </li>
               {:else if plan.id === 'max'} 
                 <li class="flex items-center">
-                  <Check class="h-4 w-4 text-primary mr-2" />
                   <span>Everything in Pro</span>
                 </li>
               {/if}
               
               {#each plan.features as feature}
                 <li class="flex items-center">
-                  <Check class="h-4 w-4 text-primary mr-2" />
                   <span>{formatFeatureName(feature)}</span>
                 </li>
               {/each}
               
               {#if plan.max_video_length}
                 <li class="flex items-center">
-                  <Check class="h-4 w-4 text-primary mr-2" />
                   <span>Videos up to {plan.max_video_length} minutes</span>
                 </li>
               {/if}
