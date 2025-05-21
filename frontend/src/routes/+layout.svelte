@@ -2,6 +2,8 @@
   import '../app.css';
   import { browser } from '$app/environment';
   import { onMount } from 'svelte';
+  import Header from '$lib/components/layout/Header.svelte';
+  import Footer from '$lib/components/layout/Footer.svelte';
   
   // Use $props() rune instead of export let
   let { data = {} } = $props<{ data?: any }>();
@@ -15,8 +17,14 @@
 </script>
 
 {#if browser && mounted}
-  <!-- Only render when in browser and component is mounted -->
-  <slot />
+  <!-- Add Header to all pages -->
+  <div class="flex min-h-screen flex-col">
+    <Header />
+    <main class="flex-1">
+      <slot />
+    </main>
+    <Footer />
+  </div>
 {:else}
   <!-- Simple loading state for SSR or before hydration -->
   <div class="loading-container">
