@@ -1,4 +1,4 @@
-<!-- frontend/src/routes/video/job/[jobId]/+page.svelte -->
+<!-- src/routes/video/job/[jobId]/+page.svelte -->
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import { page } from "$app/stores";
@@ -6,19 +6,19 @@
   import ProtectedRoute from "$lib/components/auth/ProtectedRoute.svelte";
   
   const jobId = $page.params.jobId;
-  let job = null;
-  let error = null;
-  let intervalId;
+  let job = $state(null);
+  let error = $state(null);
+  let intervalId = $state<number | null>(null);
   
   onMount(async () => {
     await checkJobStatus();
     
     // Poll for job status every 3 seconds
-    intervalId = setInterval(checkJobStatus, 3000);
+    intervalId = setInterval(checkJobStatus, 3000) as unknown as number;
   });
   
   onDestroy(() => {
-    if (intervalId) clearInterval(intervalId);
+    if (intervalId !== null) clearInterval(intervalId);
   });
   
   async function checkJobStatus() {
@@ -28,7 +28,7 @@
       
       // If job is completed, redirect to the result page
       if (status.status === "completed") {
-        clearInterval(intervalId);
+        if (intervalId !== null) clearInterval(intervalId);
         setTimeout(() => {
           window.location.href = `/video/${status.video_id}`;
         }, 1000);
@@ -36,11 +36,11 @@
       
       // If job failed, stop polling
       if (status.status === "failed") {
-        clearInterval(intervalId);
+        if (intervalId !== null) clearInterval(intervalId);
       }
     } catch (err) {
       error = err instanceof Error ? err.message : "Failed to get job status";
-      clearInterval(intervalId);
+      if (intervalId !== null) clearInterval(intervalId);
     }
   }
 </script>

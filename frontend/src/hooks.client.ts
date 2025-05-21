@@ -6,10 +6,8 @@ import { goto } from '$app/navigation';
 
 // Add init function that was missing from previous build
 export function init() {
-  // Client-side initialization
-  return {
-    // Include any client initialization data
-  };
+  // This function is required for Svelte 5 with SvelteKit
+  return {};
 }
 
 // Handle client-side errors

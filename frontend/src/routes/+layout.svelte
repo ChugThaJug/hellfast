@@ -1,4 +1,3 @@
-<!-- frontend/src/routes/+layout.svelte -->
 <script lang="ts">
   import '../app.css';
   import { browser } from '$app/environment';
@@ -8,7 +7,7 @@
   export let data;
   
   // Track if component is mounted
-  let mounted = false;
+  let mounted = $state(false);
   
   onMount(() => {
     mounted = true;

@@ -13,6 +13,9 @@ const config = {
     }),
     paths: {
       assets: ''
+    },
+    csp: {
+      mode: 'auto'
     }
   }
 };

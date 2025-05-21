@@ -4,3 +4,10 @@ export const handle = async ({ event, resolve }) => {
     ssr: false // Disable SSR for all routes
   });
 };
+
+// Required for Svelte 5
+export function handleError({ error, event }) {
+  return {
+    message: 'Server error!'
+  };
+}

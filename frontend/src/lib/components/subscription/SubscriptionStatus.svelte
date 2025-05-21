@@ -1,15 +1,15 @@
-<!-- frontend/src/lib/components/subscription/SubscriptionStatus.svelte -->
+<!-- src/lib/components/subscription/SubscriptionStatus.svelte -->
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { subscriptionApi } from '$lib/api';
   import type { SubscriptionStatus } from '$lib/api/schema';
   
-  export let minimal = false; // Set to true for a minimal display
+  let { minimal = false } = $props<{ minimal?: boolean }>();
   
-  let status: SubscriptionStatus | null = null;
-  let loading = true;
-  let error: string | null = null;
+  let status = $state<SubscriptionStatus | null>(null);
+  let loading = $state(true);
+  let error = $state<string | null>(null);
   
   onMount(async () => {
     try {

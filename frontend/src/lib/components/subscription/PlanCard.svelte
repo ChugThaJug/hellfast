@@ -1,12 +1,23 @@
-<!-- frontend/src/lib/components/subscription/PlanCard.svelte -->
+<!-- src/lib/components/subscription/PlanCard.svelte -->
 <script lang="ts">
-  import { Check } from "lucide-svelte";
   import type { SubscriptionPlan } from "$lib/api/schema";
   
-  export let plan: SubscriptionPlan;
-  export let currentPlanId: string | null = null;
-  export let processing: boolean = false;
-  export let featured: boolean = false;
+  // Props using Svelte 5 $props() rune
+  let { 
+    plan,
+    currentPlanId = null,
+    processing = false,
+    featured = false,
+    onMonthlySubscribe,
+    onYearlySubscribe
+  } = $props<{
+    plan: SubscriptionPlan;
+    currentPlanId: string | null;
+    processing: boolean;
+    featured: boolean;
+    onMonthlySubscribe: (plan: SubscriptionPlan) => void;
+    onYearlySubscribe: (plan: SubscriptionPlan) => void;
+  }>();
   
   // Function to format price
   function formatPrice(price: number): string {
@@ -23,10 +34,6 @@
       .replace(/_/g, ' ')
       .replace(/\b\w/g, char => char.toUpperCase());
   }
-  
-  // Events
-  export let onMonthlySubscribe: (plan: SubscriptionPlan) => void;
-  export let onYearlySubscribe: (plan: SubscriptionPlan) => void;
 </script>
 
 <div class={`border rounded-lg overflow-hidden ${featured ? 'shadow-lg border-primary/20' : ''}`}>
@@ -49,7 +56,10 @@
       
       {#if featured}
         <div class="bg-primary/20 h-8 w-8 rounded-full flex items-center justify-center">
-          <Check class="h-4 w-4 text-primary" />
+          <!-- Check Icon -->
+          <svg class="h-4 w-4 text-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
         </div>
       {/if}
     </div>
@@ -123,7 +133,9 @@
       <ul class="space-y-2 text-sm">
         {#each plan.features as feature}
           <li class="flex items-start">
-            <span class="h-4 w-4 mr-2 text-primary mt-0.5">✓</span>
+            <svg class="h-4 w-4 mr-2 text-primary mt-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
             <span>{formatFeatureName(feature)}</span>
           </li>
         {/each}

@@ -2,11 +2,8 @@
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
 
-// Initialize with a default value that works in SSR
-const initialTheme = 'light';
-
 // Create a writable store with the initial value
-const theme = writable<'light' | 'dark'>(initialTheme);
+const theme = writable<'light' | 'dark'>('light');
 
 // Toggle the theme
 function toggleTheme() {

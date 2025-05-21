@@ -1,14 +1,20 @@
-<!-- frontend/src/lib/components/auth/ProtectedRoute.svelte -->
+<!-- src/lib/components/auth/ProtectedRoute.svelte -->
 <script lang="ts">
   import { onMount } from 'svelte';
   import { auth } from '$lib/stores/auth';
   import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
   
-  export let requireAuth = true;
-  export let redirectTo = '/auth/login';
+  // Using Svelte 5 props
+  let { 
+    requireAuth = true,
+    redirectTo = '/auth/login'
+  } = $props<{
+    requireAuth?: boolean;
+    redirectTo?: string;
+  }>();
   
-  let initialized = false;
+  let initialized = $state(false);
 
   onMount(async () => {
     if (browser) {
@@ -21,15 +27,18 @@
     }
   });
   
-  // Handle authenticated route
-  $: if (browser && initialized && requireAuth && !$auth.authenticated && !$auth.loading) {
-    goto(redirectTo);
-  }
+  // Using $effect for reactive code
+  $effect(() => {
+    if (browser && initialized && requireAuth && !$auth.authenticated && !$auth.loading) {
+      goto(redirectTo);
+    }
+  });
   
-  // Handle non-authenticated route (like /login when already logged in)
-  $: if (browser && initialized && !requireAuth && $auth.authenticated && !$auth.loading) {
-    goto('/dashboard');
-  }
+  $effect(() => {
+    if (browser && initialized && !requireAuth && $auth.authenticated && !$auth.loading) {
+      goto('/dashboard');
+    }
+  });
 </script>
 
 {#if $auth.loading}

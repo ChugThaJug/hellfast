@@ -1,26 +1,25 @@
-<!-- frontend/src/routes/subscription/+page.svelte -->
+<!-- src/routes/subscription/+page.svelte -->
 <script lang="ts">
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import { subscriptionApi } from "$lib/api";
   import { auth } from "$lib/stores/auth";
-  import { initializePaddle } from "$lib/paddle";
   import ProtectedRoute from "$lib/components/auth/ProtectedRoute.svelte";
   import SubscriptionStatus from "$lib/components/subscription/SubscriptionStatus.svelte";
   import PlanCard from "$lib/components/subscription/PlanCard.svelte";
   import type { SubscriptionPlan, SubscriptionStatus as SubscriptionStatusType } from "$lib/api/schema";
 
-  let plans: SubscriptionPlan[] = [];
-  let currentStatus: SubscriptionStatusType | null = null;
-  let loading = true;
-  let error: string | null = null;
-  let processing = false;
-  let plansLoaded = false;
-  let authInitialized = false;
-  let paddleInitialized = false;
+  let plans = $state<SubscriptionPlan[]>([]);
+  let currentStatus = $state<SubscriptionStatusType | null>(null);
+  let loading = $state(true);
+  let error = $state<string | null>(null);
+  let processing = $state(false);
+  let plansLoaded = $state(false);
+  let authInitialized = $state(false);
+  let paddleInitialized = $state(false);
   const isDevelopment = import.meta.env.DEV || window.location.hostname === 'localhost';
-  let devCheckoutUrl: string | null = null;
+  let devCheckoutUrl = $state<string | null>(null);
 
   // Function to load plans separately from the initial mount
   async function loadPlans() {
@@ -62,22 +61,6 @@
   // On component mount - initialize Paddle first
   onMount(() => {
     try {
-      console.log("Initializing Paddle service...");
-      // Load Paddle.js script
-      const paddleScript = document.createElement('script');
-      paddleScript.src = 'https://cdn.paddle.com/paddle/v2/paddle.js';
-      paddleScript.async = true;
-      paddleScript.onload = () => {
-        // Initialize Paddle after script loads
-        paddleInitialized = initializePaddle(true); // true for sandbox, false for production
-        console.log("Paddle initialized successfully");
-      };
-      paddleScript.onerror = () => {
-        console.error("Failed to load Paddle.js");
-        error = "Failed to load payment system. Please refresh the page and try again.";
-      };
-      document.head.appendChild(paddleScript);
-
       // Check if we're already authenticated
       if ($auth.authenticated) {
         console.log("User is already authenticated, loading plans...");
@@ -88,13 +71,6 @@
       }
 
       authInitialized = true;
-
-      // Return cleanup function
-      return () => {
-        if (paddleScript.parentNode) {
-          paddleScript.parentNode.removeChild(paddleScript);
-        }
-      };
     } catch (err) {
       console.error("Error during initialization:", err);
       error = err instanceof Error ? err.message : "Initialization failed";
@@ -103,17 +79,21 @@
   });
 
   // React to auth changes
-  $: if (authInitialized && $auth.authenticated && !plansLoaded && !loading) {
-    console.log("Auth state changed to authenticated, loading plans...");
-    loading = true;
-    loadPlans();
-  }
+  $effect(() => {
+    if (authInitialized && $auth.authenticated && !plansLoaded && !loading) {
+      console.log("Auth state changed to authenticated, loading plans...");
+      loading = true;
+      loadPlans();
+    }
+  });
 
   // React to auth loading state
-  $: if (authInitialized && !$auth.loading && !$auth.authenticated) {
-    console.log("Auth loading complete but not authenticated");
-    loading = false;
-  }
+  $effect(() => {
+    if (authInitialized && !$auth.loading && !$auth.authenticated) {
+      console.log("Auth loading complete but not authenticated");
+      loading = false;
+    }
+  });
 
   async function handleSubscribe(plan: SubscriptionPlan, isYearly = false) {
     if (!$auth.authenticated) {
@@ -148,10 +128,6 @@
           } else {
             error = "The payment system returned an invalid checkout URL. Please contact support.";
             console.error("Invalid checkout URL received:", url);
-            console.log("Please ensure your Paddle account is properly configured:");
-            console.log("1. Check that your Paddle domains are correctly set up in the Paddle Dashboard");
-            console.log("2. Verify that your API keys and webhook settings are correct");
-            console.log("3. Make sure you're using the correct environment (sandbox vs production)");
           }
         } else {
           console.log("Redirecting to Paddle checkout:", url);
@@ -351,24 +327,3 @@
     {/if}
   </div>
 </ProtectedRoute>
-
-<style>
-  /* Special styling for development mode indicators */
-  :global(.dev-mode-indicator) {
-    border: 1px solid #f59e0b;
-    background-color: #fef3c7;
-    padding: 8px;
-    border-radius: 4px;
-    margin-bottom: 12px;
-  }
-
-  /* Make the development checkout options more visible */
-  :global(.checkout-dev-panel) {
-    border: 2px solid #f59e0b;
-    background-color: #fffbeb;
-    padding: 16px;
-    border-radius: 6px;
-    margin: 16px 0;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  }
-</style>

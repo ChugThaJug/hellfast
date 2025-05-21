@@ -3,12 +3,12 @@
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { videoApi } from "$lib/api";
-  import { Eye, Trash2 } from "lucide-svelte";
+  // Remove lucide imports
   import ProtectedRoute from "$lib/components/auth/ProtectedRoute.svelte";
   
-  let videos = [];
-  let loading = true;
-  let error = null;
+  let videos = $state([]);
+  let loading = $state(true);
+  let error = $state(null);
   
   onMount(async () => {
     try {
@@ -121,13 +121,22 @@
                       on:click={() => viewVideo(video.video_id)}
                       disabled={video.status !== 'completed'}
                     >
-                      <Eye class="h-4 w-4" />
+                      <!-- SVG for Eye icon -->
+                      <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                      </svg>
                     </button>
                     <button 
                       class="p-1 rounded-md hover:bg-muted" 
                       on:click={() => deleteVideo(video.video_id)}
                     >
-                      <Trash2 class="h-4 w-4 text-destructive" />
+                      <!-- SVG for Trash icon -->
+                      <svg class="h-4 w-4 text-destructive" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 6h18"/>
+                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                      </svg>
                     </button>
                   </div>
                 </td>

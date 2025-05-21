@@ -13,13 +13,13 @@ VITE_API_BASE_URL=https://hellfast-api.onrender.com
 VITE_APP_ENV=production
 "@ | Out-File -FilePath ".env" -Encoding utf8
 
-# Install dependencies normally (no package-lock enforcement for Cloudflare)
+# Install dependencies with clean install
 Write-Host "Installing dependencies..." -ForegroundColor Cyan
 npm install
 
 # Build the project
 Write-Host "Building project..." -ForegroundColor Cyan
-npm run build:cloudflare || npm run build  # Fallback to regular build if cloudflare-specific build fails
+npm run build
 
 # Ensure the _redirects file is in place for SPA routing
 Write-Host "Creating _redirects file for SPA routing..." -ForegroundColor Cyan

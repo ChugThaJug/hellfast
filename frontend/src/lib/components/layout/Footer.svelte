@@ -1,4 +1,4 @@
-<!-- frontend/src/lib/components/layout/Footer.svelte -->
+<!-- src/lib/components/layout/Footer.svelte -->
 <footer class="border-t border-border bg-background py-6">
   <div class="container px-4">
     <div class="flex flex-col md:flex-row justify-between items-center">

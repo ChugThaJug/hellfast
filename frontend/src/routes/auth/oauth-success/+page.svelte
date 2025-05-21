@@ -1,12 +1,12 @@
-<!-- frontend/src/routes/auth/oauth-success/+page.svelte -->
-<script>
+<!-- src/routes/auth/oauth-success/+page.svelte -->
+<script lang="ts">
   import { page } from "$app/stores";
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { auth } from "$lib/stores/auth";
   
-  let loading = true;
-  let error = null;
+  let loading = $state(true);
+  let error = $state(null);
   
   onMount(async () => {
     try {

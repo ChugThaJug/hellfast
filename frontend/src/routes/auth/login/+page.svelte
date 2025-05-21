@@ -1,4 +1,4 @@
-// frontend/src/routes/auth/login/+page.svelte
+<!-- src/routes/auth/login/+page.svelte -->
 <script lang="ts">
   import { onMount } from "svelte";
   import { page } from "$app/stores";
@@ -6,8 +6,8 @@
   import { auth } from "$lib/stores/auth";
   import ProtectedRoute from "$lib/components/auth/ProtectedRoute.svelte";
   
-  let loading = false;
-  let apiBaseUrl = '';
+  let loading = $state(false);
+  let apiBaseUrl = $state('');
   
   onMount(() => {
     // Get API URL from environment variable or use default

@@ -3,7 +3,7 @@ import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 
 // Simple API URL without any window references
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+export const API_URL = (browser && import.meta.env.VITE_API_URL) || 'http://localhost:8000';
 
 // Options type for fetchWithAuth
 interface FetchOptions extends RequestInit {
