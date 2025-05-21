@@ -4,7 +4,6 @@
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import ProtectedRoute from "$lib/components/auth/ProtectedRoute.svelte";
-  import { CheckCircle2 } from "lucide-svelte";
   import { subscriptionApi } from "$lib/api";
   
   let planId = '';
@@ -57,7 +56,6 @@
         <h1 class="text-2xl font-bold mb-2">Confirming subscription...</h1>
       {:else}
         <div class="w-16 h-16 bg-green-100 text-green-700 mx-auto rounded-full flex items-center justify-center mb-4">
-          <CheckCircle2 class="h-8 w-8" />
         </div>
         
         <h1 class="text-2xl font-bold mb-2">Subscription Activated!</h1>
