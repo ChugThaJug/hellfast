@@ -1,13 +1,4 @@
-# wrangler.toml for Cloudflare Pages deployment
+# Simplified wrangler.toml for Cloudflare Pages deployment
 name = "hellfast-frontend"
-
-# Define the build output directory for Pages
 pages_build_output_dir = "build"
-
-# Compatibility flags
 compatibility_flags = ["nodejs_compat"]
-
-# Routes configuration for SPA
-[[routes]]
-pattern = "/*"
-fallback = "index.html"
