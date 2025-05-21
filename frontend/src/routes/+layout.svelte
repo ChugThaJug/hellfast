@@ -3,8 +3,8 @@
   import { browser } from '$app/environment';
   import { onMount } from 'svelte';
   
-  // Import data from loader
-  export let data;
+  // Use $props() rune instead of export let
+  let { data = {} } = $props<{ data?: any }>();
   
   // Track if component is mounted
   let mounted = $state(false);

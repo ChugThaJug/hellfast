@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { Search } from "lucide-svelte";
   import VideoProcessForm from "$lib/components/video/VideoProcessForm.svelte";
   import { onMount } from 'svelte';
   
@@ -39,7 +38,6 @@
     <div class="grid md:grid-cols-3 gap-8">
       <div class="bg-background p-6 rounded-lg shadow-sm">
         <div class="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-          <Search class="h-6 w-6 text-primary" />
         </div>
         <h3 class="text-xl font-semibold mb-2">1. Paste a YouTube URL</h3>
         <p class="text-foreground/70">
